@@ -90,7 +90,7 @@ function obtenerDatosDesdeJson(datosDocTexto: string) {
 
 const CONFIG_HOJAS_NIVEL2 = [
   {
-    hoja: "CERTIFICADOS",
+    hoja: "7. CERTIFICADOS",
     columnaCodigo: 8, // I - Correo Electronico / Observación
     columnaFechaGestion: 11, // L - Fecha de realización
   },
