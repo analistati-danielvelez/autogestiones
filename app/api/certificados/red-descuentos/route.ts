@@ -1809,7 +1809,7 @@ const pdfBytes = await generarPdfRedDescuentos({
         destinatario: datosTitular.email,
         pdfBytes,
         codigoAutenticidad,
-        nombreAfiliado: datosPersonaCertificado.nombre || "Afiliado",
+        nombreAfiliado: datosTitular.nombre || "Afiliado",
         nombreCertificado: "Red de Descuentos",
       });
     
