@@ -774,7 +774,7 @@ function generarHtmlCorreoNoPosibleRedDescuentos(datos: {
 
                     <p style="margin:24px 0 0; color:#4b5563; font-size:15px; line-height:1.7;">
                       Para continuar con la generación del certificado, te invitamos a ponerte
-                      al día o comunicarte con nuestro equipo de servicio para recibir acompañamiento.
+                      al día o comunicarte con nuestra línea de atención al cliente 456 7000 ext 5 para recibir acompañamiento.
                     </p>
 
                     <p style="margin:20px 0 0; color:#4b5563; font-size:15px; line-height:1.7;">
