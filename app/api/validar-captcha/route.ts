@@ -3,13 +3,6 @@ import crypto from "crypto";
 
 const CAPTCHA_TTL_SECONDS = 15 * 60;
 
-function obtenerIp(request: Request) {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    "unknown"
-  );
-}
 
 export async function POST(request: Request) {
   try {
@@ -60,10 +53,12 @@ export async function POST(request: Request) {
     }
 
     const expiresAt = Math.floor(Date.now() / 1000) + CAPTCHA_TTL_SECONDS;
+
     const proof = crypto
       .createHmac("sha256", secretKey)
-      .update(`${expiresAt}:${obtenerIp(request)}`)
+      .update(`${expiresAt}`)
       .digest("base64url");
+
     const response = NextResponse.json({
       success: true,
       message: "Captcha validado correctamente",

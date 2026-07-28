@@ -4,6 +4,8 @@ const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 30;
 const MAX_JSON_BYTES = 128 * 1024;
 const MAX_MULTIPART_BYTES = 16 * 1024 * 1024;
+const MAX_BUCKETS = 5000;
+
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
 const PUBLIC_API_PATHS = new Set([
@@ -43,11 +45,14 @@ function hasAllowedOrigin(request: NextRequest) {
 function isRateLimited(key: string) {
   const now = Date.now();
 
-  // Evita que un gran número de claves caducadas mantenga memoria indefinidamente.
-  if (buckets.size > 10_000) {
-    for (const [bucketKey, bucket] of buckets) {
-      if (bucket.resetAt <= now) buckets.delete(bucketKey);
+  for (const [bucketKey, bucket] of buckets) {
+    if (bucket.resetAt <= now) {
+      buckets.delete(bucketKey);
     }
+  }
+
+  if (buckets.size >= MAX_BUCKETS && !buckets.has(key)) {
+    return true;
   }
 
   const current = buckets.get(key);
@@ -89,7 +94,7 @@ async function hasValidCaptchaProof(request: NextRequest) {
       "HMAC",
       key,
       decoded,
-      new TextEncoder().encode(`${expiry}:${clientIp(request)}`),
+      new TextEncoder().encode(`${expiry}`),
     );
   } catch {
     return false;
