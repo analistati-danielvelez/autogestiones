@@ -69,10 +69,13 @@ function isRateLimited(key: string) {
 async function hasValidCaptchaProof(request: NextRequest) {
   const secret = process.env.RECAPTCHA_SECRET_KEY;
   const value = request.cookies.get("captcha_proof")?.value;
-  if (!secret || !value) return false;
+  const clientId = request.cookies.get("captcha_client_id")?.value;
+
+  if (!secret || !value || !clientId) return false;
 
   const [expiryText, signature] = value.split(".");
   const expiry = Number(expiryText);
+
   if (!expiry || expiry < Math.floor(Date.now() / 1000) || !signature) {
     return false;
   }
@@ -90,11 +93,12 @@ async function hasValidCaptchaProof(request: NextRequest) {
       atob(signature.replace(/-/g, "+").replace(/_/g, "/")),
       (c) => c.charCodeAt(0),
     );
+
     return crypto.subtle.verify(
       "HMAC",
       key,
       decoded,
-      new TextEncoder().encode(`${expiry}`),
+      new TextEncoder().encode(`${expiry}:${clientId}`),
     );
   } catch {
     return false;
