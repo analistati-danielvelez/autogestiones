@@ -749,7 +749,7 @@ async function registrarSolicitudNivel2Certificados(datos: {
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: "'CERTIFICADOS'!A1",
+    range: "'7. CERTIFICADOS'!A1",
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {

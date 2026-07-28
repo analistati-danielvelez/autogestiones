@@ -132,7 +132,10 @@ export async function middleware(request: NextRequest) {
       !PUBLIC_API_PATHS.has(request.nextUrl.pathname) &&
       !(await hasValidCaptchaProof(request))
     ) {
-      return jsonError("Validación de seguridad requerida.", 403);
+      return jsonError(
+        "La validación de seguridad expiró. Por favor actualiza la página y valida nuevamente el captcha.",
+        403,
+      );
     }
   }
 

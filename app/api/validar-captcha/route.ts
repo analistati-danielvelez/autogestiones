@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
-const CAPTCHA_TTL_SECONDS = 5 * 60;
+const CAPTCHA_TTL_SECONDS = 15 * 60;
 
 function obtenerIp(request: Request) {
   return (
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       sameSite: "strict",
       secure: process.env.NODE_ENV === "production",
       maxAge: CAPTCHA_TTL_SECONDS,
-      path: "/api",
+      path: "/",
     });
 
     return response;
