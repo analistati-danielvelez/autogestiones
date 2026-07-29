@@ -1170,7 +1170,20 @@ export default function SolicitudesPage() {
         <div className="flex items-start gap-3">
           <FileText className="mt-0.5 h-5 w-5 flex-none text-[#0090D1]" />
           <p>
-          Si no encuentras la solicitud que necesitas, comunícate con nuestra línea de servicio al cliente 456 7000, o al whatsapp +57 3117641389 para recibir acompañamiento. Ten en cuenta que los certificados o respuestas a tus solicitudes serán enviados al último correo electrónico registrado en nuestro sistema; si no recibes la información, solicita la verificación o actualización de tus datos.
+            Si no encuentras la solicitud que necesitas, comunícate con nuestra línea de
+            servicio al cliente 456 7000, o al{" "}
+            <a
+              href="https://wa.me/573117641389?text=Hola%2C%20vengo%20de%20la%20p%C3%A1gina%20de%20certificados%20y%20necesito%20apoyo."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-[#00843D] underline underline-offset-2 hover:text-[#006B32]"
+            >
+              WhatsApp +57 311 764 1389
+            </a>{" "}
+            para recibir acompañamiento. Ten en cuenta que los certificados o respuestas
+            a tus solicitudes serán enviados al último correo electrónico registrado en
+            nuestro sistema; si no recibes la información, solicita la verificación o
+            actualización de tus datos.
           </p>
         </div>
       </div>
