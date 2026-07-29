@@ -1170,7 +1170,7 @@ export default function SolicitudesPage() {
         <div className="flex items-start gap-3">
           <FileText className="mt-0.5 h-5 w-5 flex-none text-[#0090D1]" />
           <p>
-          Si no encuentras la solicitud que necesitas, comunícate con nuestra línea de servicio al cliente para recibir acompañamiento. Ten en cuenta que los certificados o respuestas a tus solicitudes serán enviados al último correo electrónico registrado en nuestro sistema; si no recibes la información, solicita la verificación o actualización de tus datos.
+          Si no encuentras la solicitud que necesitas, comunícate con nuestra línea de servicio al cliente 456 7000, o al whatsapp +57 3117641389 para recibir acompañamiento. Ten en cuenta que los certificados o respuestas a tus solicitudes serán enviados al último correo electrónico registrado en nuestro sistema; si no recibes la información, solicita la verificación o actualización de tus datos.
           </p>
         </div>
       </div>
