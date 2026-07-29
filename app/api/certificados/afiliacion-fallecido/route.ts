@@ -1604,7 +1604,7 @@ async function generarPdfAfiliacionFallecido(datos: {
   
           <div class="content">
             <p>
-              Que <strong>${datos.nombreFallecido}</strong>, identificado(a) con
+              <strong>${datos.nombreFallecido}</strong>, identificado(a) con
               ${datos.tipoIdentificacionFallecido} No.
               <strong>${datos.identificacionFallecido}</strong>, se encontraba afiliado
               como beneficiario del(a) señor(a)

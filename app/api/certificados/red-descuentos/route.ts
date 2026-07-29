@@ -1127,16 +1127,16 @@ async function generarPdfRedDescuentos(datos: {
 
 const textoCertificacion =
   generoNormalizado === "M"
-    ? `Que el señor <strong>${datos.nombre}</strong>, identificado con
+    ? `El señor <strong>${datos.nombre}</strong>, identificado con
         ${datos.tipoIdentificacion} No. <strong>${datos.identificacion}</strong>,
         se encuentra afiliado a <strong>COTRAFA SOCIAL</strong> en calidad de ${datos.calidad}
         desde el año ${datos.anioAfiliacion}.`
     : generoNormalizado === "F"
-      ? `Que la señora <strong>${datos.nombre}</strong>, identificada con
+      ? `La señora <strong>${datos.nombre}</strong>, identificada con
           ${datos.tipoIdentificacion} No. <strong>${datos.identificacion}</strong>,
           se encuentra afiliada a <strong>COTRAFA SOCIAL</strong> en calidad de ${datos.calidad}
           desde el año ${datos.anioAfiliacion}.`
-      : `Que <strong>${datos.nombre}</strong>, con
+      : `<strong>${datos.nombre}</strong>, con
           ${datos.tipoIdentificacion} No. <strong>${datos.identificacion}</strong>,
           figura en los registros de <strong>COTRAFA SOCIAL</strong> en calidad de ${datos.calidad}
           desde el año ${datos.anioAfiliacion}.`;
