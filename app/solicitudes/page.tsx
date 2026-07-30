@@ -78,8 +78,11 @@ export default function SolicitudesPage() {
   const LIMITE_CARACTERES_DIRIGIDO_A = 50;
 
   const limitarDirigidoA = (valor: string) => {
-    return valor.slice(0, LIMITE_CARACTERES_DIRIGIDO_A);
+    return valor
+      .slice(0, LIMITE_CARACTERES_DIRIGIDO_A)
+      .toLocaleUpperCase("es-CO");
   };
+  
   const TAMANO_MAXIMO_ADJUNTO_BYTES = TAMANO_MAXIMO_ADJUNTO_MB * 1024 * 1024;
 
   const TIPOS_ARCHIVO_PERMITIDOS = [
