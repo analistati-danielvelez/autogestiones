@@ -82,7 +82,7 @@ export default function SolicitudesPage() {
       .slice(0, LIMITE_CARACTERES_DIRIGIDO_A)
       .toLocaleUpperCase("es-CO");
   };
-  
+
   const TAMANO_MAXIMO_ADJUNTO_BYTES = TAMANO_MAXIMO_ADJUNTO_MB * 1024 * 1024;
 
   const TIPOS_ARCHIVO_PERMITIDOS = [
@@ -986,22 +986,35 @@ export default function SolicitudesPage() {
           isRequired
         />
 
-        <label className="flex cursor-pointer items-start gap-3 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={aceptaPolitica}
-            onChange={(e) => setAceptaPolitica(e.target.checked)}
-            className="mt-1 h-4 w-4 accent-[#0090D1]"
-          />
-          <a
-            href="https://cotrafasocial.com/politica-privacidad/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-[#002869] underline"
-          >
-            Al continuar autorizas el tratamiento de datos personales, la política y el aviso de privacidad.
-          </a>
-        </label>
+        <div className="rounded-2xl border border-[#0090D1]/20 bg-[#F5FAFD] px-4 py-4 text-sm text-[#002869]">
+          <p className="leading-6">
+            Para obtener más detalles sobre cómo tratamos tus datos personales, te
+            invitamos a revisar nuestra política de Tratamiento de Datos Personales
+            completo en el siguiente enlace:{" "}
+            <a
+              href="https://cotrafasocial.com/politica-privacidad/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-[#002869] underline underline-offset-2 hover:text-[#0090D1]"
+            >
+              Políticas de tratamiento de datos y privacidad
+            </a>
+          </p>
+
+          <label className="mt-4 flex cursor-pointer items-start gap-3 border-t border-[#0090D1]/20 pt-4 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={aceptaPolitica}
+              onChange={(e) => setAceptaPolitica(e.target.checked)}
+              className="mt-1 h-4 w-4 flex-none accent-[#0090D1]"
+            />
+
+            <span>
+              He leído y acepto la autorización para el tratamiento de mis datos
+              personales
+            </span>
+          </label>
+        </div>
 
         <Script
           src="https://www.google.com/recaptcha/api.js"
