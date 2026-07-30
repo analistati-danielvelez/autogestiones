@@ -350,19 +350,35 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
     );
   }
 
-  function formatearFechaCorta(fechaTexto: string | null) {
+  function obtenerFechaLocalSinDesfase(fechaTexto: string | null) {
     if (!fechaTexto) {
-      return "";
+      return null;
     }
   
-    const fecha = new Date(fechaTexto);
+    const soloFecha = fechaTexto.split("T")[0];
+    const partes = soloFecha.split("-").map(Number);
   
-    if (isNaN(fecha.getTime())) {
+    if (partes.length !== 3) {
+      return null;
+    }
+  
+    const [anio, mes, dia] = partes;
+  
+    if (!anio || !mes || !dia) {
+      return null;
+    }
+  
+    return new Date(anio, mes - 1, dia);
+  }
+
+  function formatearFechaCorta(fechaTexto: string | null) {
+    const fecha = obtenerFechaLocalSinDesfase(fechaTexto);
+  
+    if (!fecha || isNaN(fecha.getTime())) {
       return "";
     }
   
     return fecha.toLocaleDateString("es-CO", {
-      timeZone: "America/Bogota",
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -370,18 +386,13 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
   }
 
   function formatearFechaLarga(fechaTexto: string | null) {
-    if (!fechaTexto) {
-      return "";
-    }
+    const fecha = obtenerFechaLocalSinDesfase(fechaTexto);
   
-    const fecha = new Date(fechaTexto);
-  
-    if (isNaN(fecha.getTime())) {
+    if (!fecha || isNaN(fecha.getTime())) {
       return "";
     }
   
     return fecha.toLocaleDateString("es-CO", {
-      timeZone: "America/Bogota",
       day: "2-digit",
       month: "long",
       year: "numeric",
