@@ -24,6 +24,18 @@ type BeneficiarioRedDescuentos = {
 
 const LIMITE_DIARIO_RED_DESCUENTOS = 3;
 
+const PRODUCTOS_MI_PLAN = new Set([510]);
+const TAMANO_MAXIMO_ADJUNTO_MB = 15;
+const TAMANO_MAXIMO_ADJUNTO_BYTES = TAMANO_MAXIMO_ADJUNTO_MB * 1024 * 1024;
+
+const TIPOS_ARCHIVO_PERMITIDOS = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+]);
+
+const EXTENSIONES_ARCHIVO_PERMITIDAS = [".pdf", ".jpg", ".jpeg", ".png"];
+
 const PRODUCTOS_EXEQUIALES = new Set([
   1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
   13, 14, 15, 16, 17, 18, 19, 20,
@@ -78,6 +90,64 @@ function contratoEsExequial(contrato: ContratoKaring) {
   }
 
   return PRODUCTOS_EXEQUIALES.has(productoPrevision);
+}
+
+function contratoEsMiPlan(contrato: ContratoKaring) {
+  const productoPrevision = obtenerNumero(contrato.producto_prevision);
+
+  if (productoPrevision !== null && PRODUCTOS_MI_PLAN.has(productoPrevision)) {
+    return true;
+  }
+
+  const textosProducto = [
+    obtenerTexto(contrato.nombre_producto),
+    obtenerTexto(contrato.descripcion_producto),
+    obtenerTexto(contrato.producto),
+    obtenerTexto(contrato.producto_prevision_nombre),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toUpperCase();
+
+  return (
+    textosProducto.includes("MI PLAN") ||
+    textosProducto.includes("MI FAMILIA PRIMARIA")
+  );
+}
+
+function obtenerContratosMiPlanVigentes(contratos: ContratoKaring[]) {
+  return contratos.filter((contrato) => {
+    return contratoEstaVigente(contrato) && contratoEsMiPlan(contrato);
+  });
+}
+
+function validarArchivoAdjuntoRedDescuentos(archivo: File) {
+  const nombreArchivo = archivo.name.toLowerCase();
+
+  const extensionValida = EXTENSIONES_ARCHIVO_PERMITIDAS.some((extension) =>
+    nombreArchivo.endsWith(extension)
+  );
+
+  const tipoValido = TIPOS_ARCHIVO_PERMITIDOS.has(archivo.type);
+
+  if (!extensionValida || !tipoValido) {
+    return {
+      valido: false,
+      mensaje: "Solo se permiten archivos PDF, JPG o PNG.",
+    };
+  }
+
+  if (archivo.size > TAMANO_MAXIMO_ADJUNTO_BYTES) {
+    return {
+      valido: false,
+      mensaje: `El archivo no puede superar los ${TAMANO_MAXIMO_ADJUNTO_MB} MB.`,
+    };
+  }
+
+  return {
+    valido: true,
+    mensaje: "",
+  };
 }
 
 const NIT_COTRAFA_SOCIAL = "811017024";
@@ -974,6 +1044,76 @@ async function enviarCorreoSolicitudEmpresarial(datos: {
   });
 }
 
+async function enviarCorreoInternoSolicitudMiPlanBeneficiario(datos: {
+  nombreTitular: string;
+  identificacionTitular: string;
+  correoTitular: string;
+  dirigidoA: string;
+  tipoDocumentoBeneficiario: string;
+  documentoBeneficiario: string;
+  codigoSolicitud: string;
+  contratos: string;
+  archivoNombre: string;
+  archivoBuffer: Buffer;
+  archivoMimeType: string;
+}) {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 465);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASSWORD;
+  const from = process.env.SMTP_FROM || user;
+
+  if (!host || !user || !pass || !from) {
+    throw new Error("Faltan variables de entorno para envío de correo.");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user,
+      pass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: `"Cotrafa Social" <${from}>`,
+    to: from,
+    subject: "Solicitud Red de Descuentos Mi Plan con adjunto",
+    html: `
+      <p>Cordial saludo,</p>
+
+      <p>
+        Se registró una solicitud de <strong>Red de descuentos para beneficiario Mi Plan</strong>
+        desde el aplicativo web.
+      </p>
+
+      <p><strong>Código de solicitud:</strong> ${datos.codigoSolicitud}</p>
+      <p><strong>Nombre titular:</strong> ${datos.nombreTitular}</p>
+      <p><strong>Identificación titular:</strong> ${datos.identificacionTitular}</p>
+      <p><strong>Correo titular:</strong> ${datos.correoTitular}</p>
+      <p><strong>Contrato(s):</strong> ${datos.contratos || "No disponible"}</p>
+      <p><strong>Dirigido a:</strong> ${datos.dirigidoA}</p>
+      <p><strong>Documento beneficiario:</strong> ${datos.tipoDocumentoBeneficiario} ${datos.documentoBeneficiario}</p>
+      <p><strong>Adjunto:</strong> ${datos.archivoNombre}</p>
+
+      <p>
+        El archivo adjunto enviado por el usuario se encuentra anexado a este correo.
+      </p>
+
+      <p>Atentamente,<br /><strong>Cotrafa Social</strong></p>
+    `,
+    attachments: [
+      {
+        filename: datos.archivoNombre,
+        content: datos.archivoBuffer,
+        contentType: datos.archivoMimeType,
+      },
+    ],
+  });
+}
+
 function generarHtmlCorreoCertificadoRedDescuentos(datos: {
   nombreAfiliado: string;
   nombreCertificado: string;
@@ -1426,8 +1566,233 @@ const textoCertificacion =
   }
 }
 
+async function procesarSolicitudMiPlanBeneficiario(formData: FormData) {
+  const identificacion = String(formData.get("identificacion") || "").trim();
+  const dirigidoA = String(formData.get("dirigidoA") || "").trim();
+  const tipoDocumentoBeneficiario = String(
+    formData.get("tipoDocumentoBeneficiario") || ""
+  ).trim();
+  const documentoBeneficiario = String(
+    formData.get("documentoBeneficiario") || ""
+  ).trim();
+
+  const archivoAdjunto = formData.get("archivoAdjunto");
+
+  if (!identificacion) {
+    return NextResponse.json(
+      { ok: false, message: "Debe ingresar un número de documento." },
+      { status: 400 }
+    );
+  }
+
+  if (!dirigidoA) {
+    return NextResponse.json(
+      { ok: false, message: "Debe seleccionar la entidad de la red de descuentos." },
+      { status: 400 }
+    );
+  }
+
+  if (!tipoDocumentoBeneficiario || !documentoBeneficiario) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Debe ingresar el tipo y número de documento del beneficiario.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!(archivoAdjunto instanceof File) || archivoAdjunto.size === 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Debe adjuntar un documento de soporte para esta solicitud.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const validacionArchivo = validarArchivoAdjuntoRedDescuentos(archivoAdjunto);
+
+  if (!validacionArchivo.valido) {
+    return NextResponse.json(
+      { ok: false, message: validacionArchivo.mensaje },
+      { status: 400 }
+    );
+  }
+
+  const contratos = await consultarContratos(identificacion);
+  const contratosMiPlanVigentes = obtenerContratosMiPlanVigentes(contratos);
+
+  if (contratosMiPlanVigentes.length === 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "No fue posible registrar la solicitud porque no se encontró una asistencia Mi Plan vigente.",
+      },
+      { status: 422 }
+    );
+  }
+
+  const datosTitular = obtenerDatosTitular(contratosMiPlanVigentes);
+
+  if (
+    !datosTitular.nombre ||
+    !datosTitular.identificacion ||
+    !datosTitular.tipoIdentificacion
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "No fue posible obtener la información del titular para registrar la solicitud.",
+      },
+      { status: 422 }
+    );
+  }
+
+  if (!datosTitular.email) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "No fue posible registrar la solicitud porque no hay correo registrado.",
+      },
+      { status: 422 }
+    );
+  }
+
+  const codigoSolicitud = generarCodigoAutenticidad();
+
+  const contratosTexto = contratosMiPlanVigentes
+    .map((contrato) => obtenerTexto(contrato.contrato))
+    .filter(Boolean)
+    .join(" / ");
+
+  const archivoBuffer = Buffer.from(await archivoAdjunto.arrayBuffer());
+
+  const datosDoc = JSON.stringify([
+    {
+      certificado: "Red de descuentos",
+      tipoSolicitud: "mi-plan-beneficiario-con-adjunto",
+      canal: "correo",
+      dirigidoA,
+      nombre: datosTitular.nombre,
+      tipoIdentificacion: datosTitular.tipoIdentificacion,
+      identificacion: datosTitular.identificacion,
+      emailRegistrado: "SI",
+      personaSolicitud: "beneficiario",
+      tipoDocumentoBeneficiario,
+      documentoBeneficiario,
+      archivoAdjunto: archivoAdjunto.name,
+      contratosMiPlan: contratosMiPlanVigentes.map((contrato) => ({
+        contrato: obtenerTexto(contrato.contrato) || "No disponible",
+        productoPrevision: obtenerNumero(contrato.producto_prevision),
+        producto:
+          obtenerTexto(contrato.nombre_producto) ||
+          obtenerTexto(contrato.descripcion_producto) ||
+          obtenerTexto(contrato.producto) ||
+          "MI PLAN",
+      })),
+    },
+  ]);
+
+  await registrarSolicitudEnSheets({
+    fechaCreacion: obtenerFechaRegistroTexto(),
+    usuCreacion: identificacion,
+    codigoDoc: codigoSolicitud,
+    tipoDoc: "Red de descuentos",
+    quienNecesitaDoc: "Beneficiario",
+    dirigidoADoc: dirigidoA,
+    datosDoc,
+  });
+
+  await registrarSolicitudNivel2Certificados({
+    fechaSolicitud: obtenerFechaRegistroTexto(),
+    contrato: contratosTexto,
+    cedula: datosTitular.identificacion || identificacion,
+    nombre: datosTitular.nombre,
+    dirigidoA,
+    correo: datosTitular.email,
+    codigoSolicitud,
+    tipo: "Red de descuentos",
+    certificado: `Solicitud beneficiario Mi Plan con adjunto ${archivoAdjunto.name} - ${tipoDocumentoBeneficiario} ${documentoBeneficiario}`,
+  });
+
+  await enviarCorreoSolicitudEmpresarial({
+    destinatario: datosTitular.email,
+    nombre: datosTitular.nombre,
+    identificacion: datosTitular.identificacion || identificacion,
+    codigoSolicitud,
+    tipoCertificado: "Red de descuentos para beneficiario Mi Plan",
+  });
+
+  await enviarCorreoInternoSolicitudMiPlanBeneficiario({
+    nombreTitular: datosTitular.nombre,
+    identificacionTitular: datosTitular.identificacion || identificacion,
+    correoTitular: datosTitular.email,
+    dirigidoA,
+    tipoDocumentoBeneficiario,
+    documentoBeneficiario,
+    codigoSolicitud,
+    contratos: contratosTexto,
+    archivoNombre: archivoAdjunto.name,
+    archivoBuffer,
+    archivoMimeType: archivoAdjunto.type || "application/octet-stream",
+  });
+
+  return NextResponse.json(
+    {
+      ok: true,
+      estado: "mi-plan-beneficiario-solicitud",
+      message:
+        "Solicitud enviada exitosamente.\n\nTu solicitud ha sido recibida y será validada por nuestro equipo. La respuesta será enviada al correo electrónico registrado dentro de los próximos tres (3) días hábiles.",
+      codigoSolicitud,
+    },
+    { status: 200 }
+  );
+}
+
 export async function POST(request: Request) {
   try {
+    const contentType = request.headers.get("content-type") || "";
+
+    if (contentType.toLowerCase().startsWith("multipart/form-data")) {
+      const formData = await request.formData();
+      const modo = String(formData.get("modo") || "").trim();
+
+      if (modo === "solicitud-mi-plan-beneficiario") {
+        return await procesarSolicitudMiPlanBeneficiario(formData);
+      }
+
+      return NextResponse.json(
+        { ok: false, message: "Tipo de solicitud no soportada." },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+
+    if (body?.modo === "validar-mi-plan-beneficiario") {
+      const identificacionValidar = String(body.identificacion || "").trim();
+
+      if (!identificacionValidar) {
+        return NextResponse.json(
+          { ok: false, message: "Debe ingresar un número de documento." },
+          { status: 400 }
+        );
+      }
+
+      const contratos = await consultarContratos(identificacionValidar);
+      const contratosMiPlanVigentes = obtenerContratosMiPlanVigentes(contratos);
+
+      return NextResponse.json({
+        ok: true,
+        esMiPlan: contratosMiPlanVigentes.length > 0,
+      });
+    }
+
     const {
       identificacion,
       dirigidoA,
@@ -1435,7 +1800,7 @@ export async function POST(request: Request) {
       personaCertificado,
       tipoDocumentoBeneficiario,
       documentoBeneficiario,
-    } = await request.json();
+    } = body;
 
     const canalSolicitud = canal === "correo" ? "correo" : "descargar";
 

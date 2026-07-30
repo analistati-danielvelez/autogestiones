@@ -51,6 +51,22 @@ export default function SolicitudesPage() {
   const [mostrarModalPagosSolicitud, setMostrarModalPagosSolicitud] = useState(false);
   const [archivoAdjuntoNombre, setArchivoAdjuntoNombre] = useState("");
   const [archivoAdjuntoDetallePago, setArchivoAdjuntoDetallePago] = useState<File | null>(null);
+  const [archivoAdjuntoRedDescuentos, setArchivoAdjuntoRedDescuentos] =
+  useState<File | null>(null);
+  const [
+    archivoAdjuntoRedDescuentosNombre,
+    setArchivoAdjuntoRedDescuentosNombre,
+  ] = useState("");
+  const [
+    redDescuentosBeneficiarioMiPlan,
+    setRedDescuentosBeneficiarioMiPlan,
+  ] = useState(false);
+  const [
+    redDescuentosDebePedirDocumentoBeneficiario,
+    setRedDescuentosDebePedirDocumentoBeneficiario,
+  ] = useState(false);
+  const [validandoPlanRedDescuentos, setValidandoPlanRedDescuentos] =
+    useState(false);
   const [fechaInicioDetallePago, setFechaInicioDetallePago] = useState("");
   const [fechaFinDetallePago, setFechaFinDetallePago] = useState("");
   const [enviandoDetallePago, setEnviandoDetallePago] = useState(false);
@@ -150,6 +166,21 @@ export default function SolicitudesPage() {
   
     if (inputId) {
       const inputArchivo = document.getElementById(inputId) as HTMLInputElement | null;
+  
+      if (inputArchivo) {
+        inputArchivo.value = "";
+      }
+    }
+  };
+
+  const limpiarArchivoAdjuntoRedDescuentos = (inputId?: string) => {
+    setArchivoAdjuntoRedDescuentos(null);
+    setArchivoAdjuntoRedDescuentosNombre("");
+  
+    if (inputId) {
+      const inputArchivo = document.getElementById(
+        inputId
+      ) as HTMLInputElement | null;
   
       if (inputArchivo) {
         inputArchivo.value = "";
@@ -439,6 +470,116 @@ export default function SolicitudesPage() {
     }
 
     alert(data.message || "El certificado fue enviado al correo registrado.");
+  };
+
+  const validarMiPlanBeneficiarioRedDescuentos = async () => {
+    setValidandoPlanRedDescuentos(true);
+  
+    try {
+      const respuesta = await fetch("/api/certificados/red-descuentos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          modo: "validar-mi-plan-beneficiario",
+          identificacion: identificacion.trim(),
+        }),
+      });
+  
+      const data = await respuesta.json();
+  
+      if (!respuesta.ok || !data.ok) {
+        alert(
+          data.message ||
+            "No fue posible validar el tipo de plan para Red de descuentos."
+        );
+        return null;
+      }
+  
+      return Boolean(data.esMiPlan);
+    } catch (error) {
+      alert("No fue posible validar el tipo de plan en este momento.");
+      return null;
+    } finally {
+      setValidandoPlanRedDescuentos(false);
+    }
+  };
+
+  const registrarSolicitudRedDescuentosMiPlanBeneficiario = async () => {
+    if (!entidadCertificado.trim()) {
+      alert("Por favor selecciona la entidad de la red de descuentos.");
+      return;
+    }
+  
+    if (!tipoDocumentoBeneficiario) {
+      alert("Por favor selecciona el tipo de documento del beneficiario.");
+      return;
+    }
+  
+    if (!documentoBeneficiario.trim()) {
+      alert("Por favor ingresa el número de documento del beneficiario.");
+      return;
+    }
+  
+    if (!archivoAdjuntoRedDescuentos) {
+      alert("Para esta solicitud debes adjuntar un documento de soporte.");
+      return;
+    }
+  
+    const validacion = validarArchivoDetallePago(archivoAdjuntoRedDescuentos);
+  
+    if (!validacion.valido) {
+      alert(validacion.mensaje);
+      return;
+    }
+  
+    setEnviandoCanalEnvio(true);
+  
+    try {
+      const formData = new FormData();
+  
+      formData.append("modo", "solicitud-mi-plan-beneficiario");
+      formData.append("identificacion", identificacion.trim());
+      formData.append("dirigidoA", entidadCertificado.trim());
+      formData.append("tipoDocumentoBeneficiario", tipoDocumentoBeneficiario);
+      formData.append("documentoBeneficiario", documentoBeneficiario.trim());
+      formData.append("archivoAdjunto", archivoAdjuntoRedDescuentos);
+  
+      const respuesta = await fetch("/api/certificados/red-descuentos", {
+        method: "POST",
+        body: formData,
+      });
+  
+      const data = await respuesta.json();
+  
+      if (!respuesta.ok) {
+        alert(
+          data.message ||
+            "No fue posible registrar la solicitud de Red de descuentos."
+        );
+        return;
+      }
+  
+      alert(
+        data.message ||
+          "Solicitud enviada exitosamente.\n\nTu solicitud ha sido recibida y será validada por nuestro equipo. La respuesta será enviada al correo electrónico registrado dentro de los próximos tres (3) días hábiles."
+      );
+  
+      setMostrarModalDestinoCertificado(false);
+      setPersonaCertificado("");
+      setTipoDocumentoBeneficiario("CC");
+      setDocumentoBeneficiario("");
+      setDestinoCertificado("");
+      setEntidadCertificado("");
+      setRedDescuentosBeneficiarioMiPlan(false);
+      setRedDescuentosDebePedirDocumentoBeneficiario(false);
+      limpiarArchivoAdjuntoRedDescuentos("archivoRedDescuentosMiPlan");
+    } catch (error) {
+      alert("No fue posible registrar la solicitud en este momento.");
+    } finally {
+      setEnviandoCanalEnvio(false);
+    }
   };
 
   const enviarCertificadoRedDescuentosCorreo = async () => {
@@ -744,9 +885,36 @@ export default function SolicitudesPage() {
     );
   };
   
-  const continuarDesdePersonaCertificado = () => {
+  const continuarDesdePersonaCertificado = async () => {
     if (!personaCertificado) {
       alert("Por favor selecciona quién necesita el certificado");
+      return;
+    }
+  
+    if (
+      certificadoSeleccionado === "red-descuentos" &&
+      personaCertificado === "beneficiario" &&
+      !redDescuentosDebePedirDocumentoBeneficiario
+    ) {
+      const esMiPlan = await validarMiPlanBeneficiarioRedDescuentos();
+  
+      if (esMiPlan === null) {
+        return;
+      }
+  
+      if (esMiPlan) {
+        setRedDescuentosBeneficiarioMiPlan(true);
+        setRedDescuentosDebePedirDocumentoBeneficiario(false);
+        setDocumentoBeneficiario("");
+        setArchivoAdjuntoRedDescuentos(null);
+        setArchivoAdjuntoRedDescuentosNombre("");
+        setMostrarModalPersonaCertificado(false);
+        setMostrarModalDestinoCertificado(true);
+        return;
+      }
+  
+      setRedDescuentosBeneficiarioMiPlan(false);
+      setRedDescuentosDebePedirDocumentoBeneficiario(true);
       return;
     }
   
@@ -760,7 +928,6 @@ export default function SolicitudesPage() {
         alert("Por favor ingresa el número de documento del beneficiario");
         return;
       }
-  
     }
   
     setMostrarModalPersonaCertificado(false);
@@ -768,6 +935,14 @@ export default function SolicitudesPage() {
   };
 
   const continuarDesdeDestinoCertificado = async () => {
+    if (
+      certificadoSeleccionado === "red-descuentos" &&
+      personaCertificado === "beneficiario" &&
+      redDescuentosBeneficiarioMiPlan
+    ) {
+      await registrarSolicitudRedDescuentosMiPlanBeneficiario();
+      return;
+    }
     if (certificadoSeleccionado === "red-descuentos") {
       if (!entidadCertificado.trim()) {
         alert("Por favor selecciona la entidad de la red de descuentos.");
@@ -1231,6 +1406,10 @@ export default function SolicitudesPage() {
               setDocumentoBeneficiario("");
               setDestinoCertificado("");
               setEntidadCertificado("");
+              setRedDescuentosBeneficiarioMiPlan(false);
+              setRedDescuentosDebePedirDocumentoBeneficiario(false);
+              setArchivoAdjuntoRedDescuentos(null);
+              setArchivoAdjuntoRedDescuentosNombre("");
               setMostrarModalPersonaCertificado(true);
               return;
             }
@@ -1798,7 +1977,31 @@ export default function SolicitudesPage() {
           </div>
         )}
 
-        {personaCertificado === "beneficiario" && (
+{personaCertificado === "beneficiario" &&
+  certificadoSeleccionado === "red-descuentos" &&
+  !redDescuentosDebePedirDocumentoBeneficiario && (
+    <div className="mt-6 rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[#0090D1] text-white">
+          <Info className="h-5 w-5" />
+        </div>
+
+        <div>
+          <p className="font-bold">Validación del tipo de plan</p>
+
+          <p className="mt-2 text-gray-700">
+            Al continuar, validaremos si tu asistencia corresponde a Mi Plan.
+            Si es así, la solicitud del beneficiario requerirá adjuntar un
+            soporte para ser revisada por nuestro equipo.
+          </p>
+        </div>
+      </div>
+    </div>
+  )}
+
+        {personaCertificado === "beneficiario" &&
+          (certificadoSeleccionado !== "red-descuentos" ||
+            redDescuentosDebePedirDocumentoBeneficiario) && (
           <div className="mt-8 grid gap-5 text-left">
             <Select
               label="Tipo de documento"
@@ -1834,10 +2037,15 @@ export default function SolicitudesPage() {
         </Button>
 
         <Button
-          className="w-full bg-[#0090D1] px-8 py-5 font-bold text-white hover:bg-[#007bb3] sm:w-auto sm:px-12 sm:py-6"
+          className={`w-full px-8 py-5 font-bold sm:w-auto sm:px-12 sm:py-6 ${
+            validandoPlanRedDescuentos
+              ? "bg-gray-300 text-gray-500"
+              : "bg-[#0090D1] text-white hover:bg-[#007bb3]"
+          }`}
           onClick={continuarDesdePersonaCertificado}
+          disabled={validandoPlanRedDescuentos}
         >
-          Siguiente
+          {validandoPlanRedDescuentos ? "Validando plan..." : "Siguiente"}
         </Button>
       </div>
     </div>
@@ -1903,6 +2111,118 @@ export default function SolicitudesPage() {
             )}
           </Autocomplete>
         </div>
+
+        {redDescuentosBeneficiarioMiPlan && (
+  <>
+    <div className="mt-6 rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
+      <div className="flex items-start gap-3">
+        <Info className="mt-0.5 h-5 w-5 flex-none text-[#0090D1]" />
+        <p>
+          Esta solicitud corresponde a beneficiario de Mi Plan. Para continuar,
+          debes ingresar el documento del beneficiario y adjuntar un soporte.
+          La solicitud será revisada por nuestro equipo y la respuesta será
+          enviada al correo registrado.
+        </p>
+      </div>
+    </div>
+
+    <div className="mt-6 grid gap-5 text-left">
+      <Select
+        label="Tipo de documento del beneficiario"
+        selectedKeys={[tipoDocumentoBeneficiario]}
+        onChange={(e) => setTipoDocumentoBeneficiario(e.target.value)}
+        isRequired
+      >
+        <SelectItem key="CC">CC - Cédula de ciudadanía</SelectItem>
+        <SelectItem key="TI">TI - Tarjeta de identidad</SelectItem>
+        <SelectItem key="RC">RC - Registro civil</SelectItem>
+        <SelectItem key="CE">CE - Cédula de extranjería</SelectItem>
+      </Select>
+
+      <Input
+        type="text"
+        label="Número de documento del beneficiario"
+        placeholder="Ej: 123456789"
+        value={documentoBeneficiario}
+        onChange={(e) => setDocumentoBeneficiario(e.target.value)}
+        isRequired
+      />
+    </div>
+
+    <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 text-left">
+      <h4 className="text-lg font-bold text-[#002869]">
+        Adjuntar documento de soporte
+      </h4>
+
+      <p className="mt-2 text-sm text-gray-500">
+        Para solicitudes de beneficiarios Mi Plan, el soporte es obligatorio.
+      </p>
+
+      <div className="mt-5 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+        <input
+          type="file"
+          id="archivoRedDescuentosMiPlan"
+          className="hidden"
+          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+          onChange={(e) => {
+            const archivo = e.target.files?.[0] || null;
+
+            if (!archivo) {
+              setArchivoAdjuntoRedDescuentos(null);
+              setArchivoAdjuntoRedDescuentosNombre("");
+              return;
+            }
+
+            const validacion = validarArchivoDetallePago(archivo);
+
+            if (!validacion.valido) {
+              alert(validacion.mensaje);
+              e.target.value = "";
+              setArchivoAdjuntoRedDescuentos(null);
+              setArchivoAdjuntoRedDescuentosNombre("");
+              return;
+            }
+
+            setArchivoAdjuntoRedDescuentos(archivo);
+            setArchivoAdjuntoRedDescuentosNombre(archivo.name);
+          }}
+        />
+
+        <label
+          htmlFor="archivoRedDescuentosMiPlan"
+          className="inline-flex cursor-pointer items-center justify-center rounded-full bg-[#0090D1] px-6 py-3 font-bold text-white hover:bg-[#007bb3]"
+        >
+          Selecciona un archivo
+        </label>
+
+        <p className="mt-3 text-sm text-gray-500">
+          Formatos permitidos: PDF, JPG, PNG. Tamaño máximo: 15 MB
+        </p>
+
+        {archivoAdjuntoRedDescuentosNombre && (
+          <div className="mt-4 flex items-center justify-center gap-3 rounded-xl border border-[#0090D1]/20 bg-white px-4 py-3 text-sm font-semibold text-[#002869]">
+            <span className="break-all">
+              Archivo seleccionado: {archivoAdjuntoRedDescuentosNombre}
+            </span>
+
+            <button
+              type="button"
+              onClick={() =>
+                limpiarArchivoAdjuntoRedDescuentos(
+                  "archivoRedDescuentosMiPlan"
+                )
+              }
+              className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-red-50 text-red-600 transition hover:bg-red-100"
+              title="Quitar archivo"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  </>
+)}
     </>
   ) : (
     <>
@@ -1978,17 +2298,23 @@ export default function SolicitudesPage() {
               Regresar
             </Button>
 
-              <Button
-                className={`w-full px-8 py-5 font-bold sm:w-auto sm:px-12 sm:py-6 ${
-                  enviandoCanalEnvio
-                    ? "bg-gray-300 text-gray-500"
-                    : "bg-[#0090D1] text-white hover:bg-[#007bb3]"
-                }`}
-                onClick={continuarDesdeDestinoCertificado}
-                disabled={enviandoCanalEnvio}
-              >
-                {enviandoCanalEnvio ? "Enviando..." : "Continuar"}
-              </Button>
+            <Button
+              className={`w-full px-8 py-5 font-bold sm:w-auto sm:px-12 sm:py-6 ${
+                enviandoCanalEnvio
+                  ? "bg-gray-300 text-gray-500"
+                  : "bg-[#0090D1] text-white hover:bg-[#007bb3]"
+              }`}
+              onClick={continuarDesdeDestinoCertificado}
+              disabled={enviandoCanalEnvio}
+            >
+              {enviandoCanalEnvio
+                ? "Enviando..."
+                : certificadoSeleccionado === "red-descuentos" &&
+                    personaCertificado === "beneficiario" &&
+                    redDescuentosBeneficiarioMiPlan
+                  ? "Enviar solicitud"
+                  : "Continuar"}
+            </Button>
             </div>
           </div>
         </div>
