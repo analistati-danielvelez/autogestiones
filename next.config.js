@@ -1,12 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+
   async headers() {
     const contentSecurityPolicy = [
       "default-src 'self'",
       "base-uri 'self'",
       "form-action 'self' https://checkout.wompi.co",
-      "frame-ancestors 'none'",
+
+      // Dominios autorizados para mostrar la aplicación en un iframe
+      "frame-ancestors 'self' https://cotrafasocial.com https://www.cotrafasocial.com",
+
       "object-src 'none'",
       "script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com",
       "style-src 'self' 'unsafe-inline'",
@@ -21,15 +25,30 @@ const nextConfig = {
       {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: contentSecurityPolicy },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
+          {
+            key: "Content-Security-Policy",
+            value: contentSecurityPolicy,
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+
+          // No agregar X-Frame-Options:
+          // CSP frame-ancestors controla qué sitios pueden embeber la aplicación.
+
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
-          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin",
+          },
           {
             key: "Strict-Transport-Security",
             value: "max-age=31536000; includeSubDomains",
