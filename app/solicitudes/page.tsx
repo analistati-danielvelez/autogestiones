@@ -34,7 +34,7 @@ export default function SolicitudesPage() {
   const [validandoCaptcha, setValidandoCaptcha] = useState(false);
   const [validado, setValidado] = useState(false);
   const [tipoUsuarioValidado, setTipoUsuarioValidado] = useState<
-      "afiliado" | "proveedor"
+      "afiliado" | "proveedor" | "afiliado-proveedor"
     >("afiliado");
   const [productoSeleccionado, setProductoSeleccionado] = useState("afiliacion");
   const [certificadoSeleccionado, setCertificadoSeleccionado] = useState("afiliacion-nucleo");
@@ -288,13 +288,20 @@ export default function SolicitudesPage() {
       }
 
       const tipoUsuario =
-        dataAfiliado.tipoUsuario === "proveedor" ? "proveedor" : "afiliado";
-
+      dataAfiliado.tipoUsuario === "proveedor"
+        ? "proveedor"
+        : dataAfiliado.tipoUsuario === "afiliado-proveedor"
+          ? "afiliado-proveedor"
+          : "afiliado";
+    
       setTipoUsuarioValidado(tipoUsuario);
-
+      
       if (tipoUsuario === "proveedor") {
         setProductoSeleccionado("contrato");
         setCertificadoSeleccionado("retencion-fuente");
+      } else {
+        setProductoSeleccionado("afiliacion");
+        setCertificadoSeleccionado("afiliacion-nucleo");
       }
 
       setValidado(true);
@@ -362,12 +369,14 @@ export default function SolicitudesPage() {
               (opcion) => opcion.id === "retencion-fuente"
             ),
           }
-        : {
-            ...opcionesPorProducto,
-            contrato: opcionesPorProducto.contrato.filter(
-              (opcion) => opcion.id !== "retencion-fuente"
-            ),
-          };
+        : tipoUsuarioValidado === "afiliado-proveedor"
+          ? opcionesPorProducto
+          : {
+              ...opcionesPorProducto,
+              contrato: opcionesPorProducto.contrato.filter(
+                (opcion) => opcion.id !== "retencion-fuente"
+              ),
+            };
 
   const obtenerNombreCertificado = () => {
     const opciones = opcionesPorProducto[productoSeleccionado] || [];

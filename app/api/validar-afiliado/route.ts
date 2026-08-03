@@ -257,14 +257,6 @@ function contratoEsEmpresarial(contrato: ContratoKaring) {
         token
       );
 
-      if (esProveedorValido) {
-        return NextResponse.json({
-          ok: true,
-          tipoUsuario: "proveedor",
-          message: "Proveedor validado correctamente.",
-        });
-      }
-
       const urlConsulta = new URL(contratosUrl);
 
       urlConsulta.searchParams.set("identificacion", identificacionTexto);
@@ -298,29 +290,48 @@ function contratoEsEmpresarial(contrato: ContratoKaring) {
         );
       }
   
+      let esAfiliadoValido = false;
+
       if (Array.isArray(contratosData) && contratosData.length > 0) {
         const contratosActivos = contratosData.filter(contratoEstaActivo);
-  
+
         if (contratosActivos.length > 0) {
           const datosTitular =
             obtenerDatosTitularParaCertificado(contratosActivos);
-  
-          if (
+
+          esAfiliadoValido = Boolean(
             datosTitular.nombre &&
-            datosTitular.tipoIdentificacion &&
-            datosTitular.identificacion &&
-            datosTitular.anioAfiliacion
-          ) {
-            return NextResponse.json({
-              ok: true,
-              tipoUsuario: "afiliado",
-              message: "Afiliado validado correctamente.",
-            });
-          }
+              datosTitular.tipoIdentificacion &&
+              datosTitular.identificacion &&
+              datosTitular.anioAfiliacion
+          );
         }
       }
-  
-  
+
+      if (esAfiliadoValido && esProveedorValido) {
+        return NextResponse.json({
+          ok: true,
+          tipoUsuario: "afiliado-proveedor",
+          message: "Afiliado y proveedor validado correctamente.",
+        });
+      }
+
+      if (esAfiliadoValido) {
+        return NextResponse.json({
+          ok: true,
+          tipoUsuario: "afiliado",
+          message: "Afiliado validado correctamente.",
+        });
+      }
+
+      if (esProveedorValido) {
+        return NextResponse.json({
+          ok: true,
+          tipoUsuario: "proveedor",
+          message: "Proveedor validado correctamente.",
+        });
+      }
+
       return NextResponse.json(
         {
           ok: false,
@@ -329,6 +340,7 @@ function contratoEsEmpresarial(contrato: ContratoKaring) {
         },
         { status: 404 }
       );
+
     } catch (error) {
       console.error("Error validando afiliado:", error);
   

@@ -498,8 +498,7 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
       if (identificacion.trim() === identificacionTitular.trim()) {
         continue;
       }
-  
-      // Excluir registro marcado como titular
+
       if (adicional?.trim().toUpperCase() === "T") {
         continue;
       }
@@ -565,7 +564,6 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
     }
   
     const documentoBuscado = normalizarDocumento(documentoFallecido);
-    const documentoTitular = normalizarDocumento(identificacionTitular);
   
     const coincidencias = asegurados.filter((asegurado) => {
       if (
@@ -579,7 +577,6 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
       const persona = asegurado as Record<string, unknown>;
   
       const identificacion = obtenerTexto(persona.identificacion);
-      const adicional = obtenerTexto(persona.adicional);
       const fechaFallecio = obtenerTexto(persona.fecha_fallecio);
   
       if (!identificacion) {
@@ -587,14 +584,6 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
       }
   
       if (normalizarDocumento(identificacion) !== documentoBuscado) {
-        return false;
-      }
-  
-      if (normalizarDocumento(identificacion) === documentoTitular) {
-        return false;
-      }
-  
-      if (adicional?.trim().toUpperCase() === "T") {
         return false;
       }
   
