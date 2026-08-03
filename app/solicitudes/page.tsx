@@ -352,17 +352,22 @@ export default function SolicitudesPage() {
       ? productosCertificados.filter((producto) => producto.id === "contrato")
       : productosCertificados;
 
-  const opcionesDisponiblesPorProducto: Record<
-    string,
-    { id: string; label: string }[]
-  > =
-    tipoUsuarioValidado === "proveedor"
-      ? {
-          contrato: opcionesPorProducto.contrato.filter(
-            (opcion) => opcion.id === "retencion-fuente"
-          ),
-        }
-      : opcionesPorProducto;
+      const opcionesDisponiblesPorProducto: Record<
+      string,
+      { id: string; label: string }[]
+    > =
+      tipoUsuarioValidado === "proveedor"
+        ? {
+            contrato: opcionesPorProducto.contrato.filter(
+              (opcion) => opcion.id === "retencion-fuente"
+            ),
+          }
+        : {
+            ...opcionesPorProducto,
+            contrato: opcionesPorProducto.contrato.filter(
+              (opcion) => opcion.id !== "retencion-fuente"
+            ),
+          };
 
   const obtenerNombreCertificado = () => {
     const opciones = opcionesPorProducto[productoSeleccionado] || [];
@@ -1380,13 +1385,6 @@ export default function SolicitudesPage() {
       </div>
 
       <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-        <Button
-          className="border border-[#002869] bg-white px-10 py-6 font-bold text-[#002869]"
-          onClick={() => setValidado(false)}
-        >
-          Regresar
-        </Button>
-
         <Button
           className="bg-[#0090D1] px-10 py-6 font-bold text-white hover:bg-[#007bb3]"
           onClick={() => {

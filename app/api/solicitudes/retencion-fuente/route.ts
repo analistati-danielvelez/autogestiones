@@ -656,7 +656,7 @@ async function enviarCorreoConfirmacion(datos: {
 
 export async function POST(request: Request) {
   try {
-    const { identificacion, tipoUsuario } = await request.json();
+    const { identificacion } = await request.json();
 
     if (!identificacion || !String(identificacion).trim()) {
       return NextResponse.json(
@@ -666,138 +666,43 @@ export async function POST(request: Request) {
     }
 
     const identificacionTexto = String(identificacion).trim();
-    const tipoUsuarioSolicitud =
-      tipoUsuario === "proveedor" ? "proveedor" : "afiliado";
 
-      const token = await obtenerToken();
-
-      let contratos: ContratoKaring[] = [];
-      let contratosExequiales: ContratoKaring[] = [];
-      let contratosEmpresarialesActivos: ContratoKaring[] = [];
-      
-      if (tipoUsuarioSolicitud !== "proveedor") {
-        contratos = await consultarContratos(identificacionTexto);
-        contratosExequiales = obtenerContratosExequiales(contratos);
-        contratosEmpresarialesActivos = obtenerContratosEmpresarialesActivos(contratos);
-      }
-      
-      let nombreSolicitud: string | null = null;
-      let identificacionSolicitud: string | null = null;
-      let emailSolicitud: string | null = null;
-      let contratosTexto = "No aplica";
-      let productosTexto = "No aplica";
-      let quienNecesitaDoc = "Titular";
-      let tipoSolicitante: "afiliado" | "empresarial" | "proveedor" =
-        tipoUsuarioSolicitud === "proveedor" ? "proveedor" : "afiliado";
-
-        if (tipoUsuarioSolicitud !== "proveedor") {
-          const contratosParaSolicitud =
-            contratosEmpresarialesActivos.length > 0
-              ? contratosEmpresarialesActivos
-              : contratosExequiales;
-        
-          const esSolicitudEmpresarial = contratosEmpresarialesActivos.length > 0;
-        
-          if (contratosParaSolicitud.length === 0) {
-            return NextResponse.json(
-              {
-                ok: false,
-                message:
-                  "No fue posible registrar la solicitud porque no se encontraron contratos válidos.",
-              },
-              { status: 422 }
-            );
-          }
-        
-          const datosTitular = obtenerDatosTitular(contratosParaSolicitud);
-        
-          if (
-            !datosTitular.nombre ||
-            !datosTitular.identificacion ||
-            !datosTitular.tipoIdentificacion
-          ) {
-            return NextResponse.json(
-              {
-                ok: false,
-                message:
-                  "No fue posible obtener la información del titular para registrar la solicitud.",
-              },
-              { status: 422 }
-            );
-          }
-        
-          if (!datosTitular.email) {
-            return NextResponse.json(
-              {
-                ok: false,
-                message:
-                  "No fue posible registrar la solicitud porque no hay correo relacionado a la cédula.",
-              },
-              { status: 422 }
-            );
-          }
-        
-          const planesSolicitud = esSolicitudEmpresarial
-            ? contratosParaSolicitud.map((contrato) => ({
-                contrato: obtenerTexto(contrato.contrato) || "No disponible",
-                producto:
-                  obtenerTexto(contrato.nombre_producto) ||
-                  obtenerTexto(contrato.descripcion_producto) ||
-                  obtenerTexto(contrato.producto) ||
-                  obtenerTexto(contrato.descripcion_grupal) ||
-                  "Plan empresarial",
-              }))
-            : await obtenerPlanesExequiales(contratosExequiales);
-        
-          contratosTexto = planesSolicitud
-            .map((plan) => plan.contrato)
-            .join(" / ");
-        
-          productosTexto = planesSolicitud
-            .map((plan) => plan.producto)
-            .join(" / ");
-        
-          nombreSolicitud = datosTitular.nombre;
-          identificacionSolicitud = datosTitular.identificacion;
-          emailSolicitud = datosTitular.email;
-          quienNecesitaDoc = esSolicitudEmpresarial ? "Empresarial" : "Titular";
-          tipoSolicitante = esSolicitudEmpresarial ? "empresarial" : "afiliado";
-        } else {
-      const proveedor = await consultarProveedorValido(
-        identificacionTexto,
-        token
-      );
+    const token = await obtenerToken();
     
-      if (!proveedor) {
-        return NextResponse.json(
-          {
-            ok: false,
-            message:
-              "No fue posible registrar la solicitud porque no se encontró información válida del proveedor.",
-          },
-          { status: 422 }
-        );
-      }
-
-      if (!proveedor.nombre || !proveedor.email) {
-        return NextResponse.json(
-          {
-            ok: false,
-            message:
-              "No fue posible registrar la solicitud porque el proveedor no tiene nombre o correo registrado.",
-          },
-          { status: 422 }
-        );
-      }
-
-      nombreSolicitud = proveedor.nombre;
-      identificacionSolicitud = proveedor.identificacion;
-      emailSolicitud = proveedor.email;
-      contratosTexto = "No aplica";
-      productosTexto = "Proveedor";
-      quienNecesitaDoc = "Proveedor";
-      tipoSolicitante = "proveedor";
+    const proveedor = await consultarProveedorValido(
+      identificacionTexto,
+      token
+    );
+    
+    if (!proveedor) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Esta solicitud solo está disponible para proveedores activos de Cotrafa Social.",
+        },
+        { status: 403 }
+      );
     }
+    
+    if (!proveedor.nombre || !proveedor.email) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "No fue posible registrar la solicitud porque el proveedor no tiene nombre o correo registrado.",
+        },
+        { status: 422 }
+      );
+    }
+    
+    const nombreSolicitud = proveedor.nombre;
+    const identificacionSolicitud = proveedor.identificacion;
+    const emailSolicitud = proveedor.email;
+    const contratosTexto = "No aplica";
+    const productosTexto = "Proveedor";
+    const quienNecesitaDoc = "Proveedor";
+    const tipoSolicitante = "proveedor" as const;
 
     const cantidadSolicitudesHoy = await contarSolicitudesRetencionFuenteHoy(
       identificacionTexto
@@ -840,12 +745,7 @@ export async function POST(request: Request) {
 
     await registrarSolicitudNivel2RetencionFuente({
       fechaSolicitud: obtenerFechaRegistroTexto(),
-      tipoSolicitud:
-        tipoSolicitante === "proveedor"
-          ? "Retención en la fuente proveedor"
-          : tipoSolicitante === "empresarial"
-            ? "Retención en la fuente empresarial"
-            : "Retención en la fuente",
+      tipoSolicitud: "Retención en la fuente proveedor",
       cedula: identificacionSolicitud || identificacionTexto,
       nombre: nombreSolicitud || "",
       correo: emailSolicitud || "",

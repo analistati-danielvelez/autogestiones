@@ -251,8 +251,22 @@ function contratoEsEmpresarial(contrato: ContratoKaring) {
       }
   
       const token = await obtenerToken();
-  
+
+      const esProveedorValido = await validarProveedorPorTercero(
+        identificacionTexto,
+        token
+      );
+
+      if (esProveedorValido) {
+        return NextResponse.json({
+          ok: true,
+          tipoUsuario: "proveedor",
+          message: "Proveedor validado correctamente.",
+        });
+      }
+
       const urlConsulta = new URL(contratosUrl);
+
       urlConsulta.searchParams.set("identificacion", identificacionTexto);
   
       const contratosResponse = await fetch(urlConsulta.toString(), {
@@ -306,18 +320,6 @@ function contratoEsEmpresarial(contrato: ContratoKaring) {
         }
       }
   
-      const esProveedorValido = await validarProveedorPorTercero(
-        identificacionTexto,
-        token
-      );
-      
-      if (esProveedorValido) {
-        return NextResponse.json({
-          ok: true,
-          tipoUsuario: "proveedor",
-          message: "Proveedor validado correctamente.",
-        });
-      }
   
       return NextResponse.json(
         {
