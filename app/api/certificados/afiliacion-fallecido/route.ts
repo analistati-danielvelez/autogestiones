@@ -1859,7 +1859,48 @@ async function generarPdfAfiliacionFallecido(datos: {
   
       if (!resultadoPlanes.estaAlDia) {
         const datosTitularMoroso = obtenerDatosTitular(contratosExequialesVigentes);
-  
+      
+        const contratosMorososTexto = resultadoPlanes.contratosMorosos
+          .map((contrato) => contrato.contrato)
+          .filter(Boolean)
+          .join(" / ");
+      
+        const productosMorososTexto = resultadoPlanes.contratosMorosos
+          .map((contrato) => contrato.producto)
+          .filter(Boolean)
+          .join(" / ");
+      
+        const datosDocMoroso = JSON.stringify([
+          {
+            certificado: "Certificado de afiliación del fallecido",
+            estado: "moroso",
+            motivo:
+              "No fue posible generar el certificado automáticamente porque el titular presenta cartera pendiente.",
+            canal: canalSolicitud,
+            dirigidoA: dirigidoATexto,
+            titular: {
+              nombre: datosTitularMoroso.nombre || "Afiliado",
+              identificacion:
+                datosTitularMoroso.identificacion || String(identificacion).trim(),
+              emailRegistrado: datosTitularMoroso.email ? "SI" : "NO",
+            },
+            documentoFallecido: String(documentoFallecido).trim(),
+            contratosMorosos: resultadoPlanes.contratosMorosos,
+            contratos: contratosMorososTexto,
+            productos: productosMorososTexto,
+          },
+        ]);
+      
+        await registrarSolicitudEnSheets({
+          fechaCreacion: obtenerFechaRegistroTexto(),
+          usuCreacion: String(identificacion).trim(),
+          codigoDoc: "NO GENERADO POR MORA",
+          tipoDoc: "Certificado de afiliación del fallecido",
+          quienNecesitaDoc: "Beneficiario fallecido",
+          dirigidoADoc: dirigidoATexto,
+          datosDoc: datosDocMoroso,
+        });
+      
         if (canalSolicitud === "correo" && datosTitularMoroso.email) {
           await enviarCorreoContratosMorosos({
             destinatario: datosTitularMoroso.email,
@@ -1868,7 +1909,7 @@ async function generarPdfAfiliacionFallecido(datos: {
               datosTitularMoroso.identificacion || String(identificacion).trim(),
             contratosMorosos: resultadoPlanes.contratosMorosos,
           });
-  
+      
           return NextResponse.json(
             {
               ok: true,
@@ -1879,10 +1920,11 @@ async function generarPdfAfiliacionFallecido(datos: {
             { status: 200 }
           );
         }
-  
+      
         return NextResponse.json(
           {
             ok: false,
+            estado: "moroso",
             message:
               "No fue posible generar el certificado porque no se cumplen las condiciones requeridas.",
           },
