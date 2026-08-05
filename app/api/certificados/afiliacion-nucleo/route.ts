@@ -2016,6 +2016,54 @@ const resultadoPlanes = await obtenerPlanesExequialesAlDia(
 if (!resultadoPlanes.estaAlDia) {
   const datosTitularMoroso = obtenerDatosTitular(contratosExequialesVigentes);
 
+  const contratosMorososTexto = resultadoPlanes.contratosMorosos
+    .map((contrato) => contrato.contrato)
+    .filter(Boolean)
+    .join(" / ");
+
+  const productosMorososTexto = resultadoPlanes.contratosMorosos
+    .map((contrato) => contrato.producto)
+    .filter(Boolean)
+    .join(" / ");
+
+  const datosDocMoroso = JSON.stringify([
+    {
+      certificado: "Afiliación núcleo familiar",
+      estado: "moroso",
+      motivo:
+        "No fue posible generar el certificado automáticamente porque el titular presenta cartera pendiente.",
+      canal: canalSolicitud,
+      dirigidoA: dirigidoATexto,
+      titular: {
+        nombre: datosTitularMoroso.nombre || "Afiliado",
+        identificacion:
+          datosTitularMoroso.identificacion || String(identificacion).trim(),
+        emailRegistrado: datosTitularMoroso.email ? "SI" : "NO",
+      },
+      personaSolicitud,
+      tipoDocumentoBeneficiario:
+        personaSolicitud === "beneficiario" ? tipoDocumentoBeneficiario : null,
+      documentoBeneficiario:
+        personaSolicitud === "beneficiario"
+          ? String(documentoBeneficiario).trim()
+          : null,
+      contratosMorosos: resultadoPlanes.contratosMorosos,
+      contratos: contratosMorososTexto,
+      productos: productosMorososTexto,
+    },
+  ]);
+
+  await registrarSolicitudEnSheets({
+    fechaCreacion: obtenerFechaRegistroTexto(),
+    usuCreacion: String(identificacion).trim(),
+    codigoDoc: "NO GENERADO POR MORA",
+    tipoDoc: "Afiliación núcleo familiar",
+    quienNecesitaDoc:
+      personaSolicitud === "beneficiario" ? "Beneficiario" : "Titular",
+    dirigidoADoc: dirigidoATexto,
+    datosDoc: datosDocMoroso,
+  });
+
   if (canalSolicitud === "correo" && datosTitularMoroso.email) {
     await enviarCorreoContratosMorosos({
       destinatario: datosTitularMoroso.email,
@@ -2039,6 +2087,7 @@ if (!resultadoPlanes.estaAlDia) {
   return NextResponse.json(
     {
       ok: false,
+      estado: "moroso",
       message:
         "No fue posible generar el certificado porque no se cumplen las condiciones requeridas.",
     },
