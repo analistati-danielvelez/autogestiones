@@ -1029,10 +1029,12 @@ const fechaFallecimientoSolicitud =
       .map((plan) => plan.producto)
       .join(" / ");
 
+      const entidadFinancieraTexto = String(entidadFinanciera || "").trim();
+
       const destinoGastosTexto =
-  String(destinoGastos).trim() === "interesado"
-    ? "A quien pueda interesar"
-    : "Especifique la entidad";
+        String(destinoGastos).trim() === "interesado"
+          ? "A quien pueda interesar"
+          : entidadFinancieraTexto;
 
     const datosDoc = JSON.stringify([
       {
@@ -1044,7 +1046,7 @@ const fechaFallecimientoSolicitud =
         contratos: contratosTexto,
         productos: productosTexto,
         destinoGastos: destinoGastosTexto,
-        entidadFinanciera: String(entidadFinanciera || "").trim(),
+        entidadFinanciera: entidadFinancieraTexto,
         cedulaFallecido: String(cedulaFallecido).trim(),
         nombreFallecido: nombreFallecidoSolicitud,
         fechaFallecimiento: fechaFallecimientoSolicitud,
@@ -1070,10 +1072,7 @@ const fechaFallecimientoSolicitud =
         cedulaFallecido: String(cedulaFallecido).trim(),
         nombreFallecido: nombreFallecidoSolicitud,
         fechaFallecimiento: fechaFallecimientoSolicitud,
-        dirigidoA:
-          String(destinoGastos).trim() === "interesado"
-            ? "A quien pueda interesar"
-            : String(entidadFinanciera || "").trim(),
+        dirigidoA: destinoGastosTexto,
         observacion: `${datosTitular.email} / ${codigoSolicitud}`,
       });
 
@@ -1085,7 +1084,7 @@ const fechaFallecimientoSolicitud =
         productosTexto,
         codigoSolicitud,
         destinoGastos: destinoGastosTexto,
-        entidadFinanciera: String(entidadFinanciera || "").trim(),
+        entidadFinanciera: entidadFinancieraTexto,
         cedulaFallecido: String(cedulaFallecido).trim(),
         nombreFallecido: nombreFallecidoSolicitud,
         fechaFallecimiento: fechaFallecimientoSolicitud,
