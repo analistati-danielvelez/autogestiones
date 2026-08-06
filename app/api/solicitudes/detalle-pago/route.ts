@@ -561,7 +561,6 @@ async function enviarCorreoConfirmacion(datos: {
 }
 
 async function enviarCorreoAreaDetallePago(datos: {
-    destinatario: string;
     nombre: string;
     identificacion: string;
     fechaInicio: string;
@@ -593,7 +592,7 @@ async function enviarCorreoAreaDetallePago(datos: {
   
     await transporter.sendMail({
       from: `"Cotrafa Social" <${from}>`,
-      to: datos.destinatario,
+      to: from,
       subject: `Detalle de pago - ${datos.identificacion} - ${datos.codigoSolicitud}`,
       html: `
         <p>Cordial saludo,</p>
@@ -871,7 +870,6 @@ const archivoAdjunto =
 
     if (archivoParaCorreo) {
         await enviarCorreoAreaDetallePago({
-          destinatario: "analistati@cotrafasocial.com.co",
           nombre: datosTitular.nombre,
           identificacion: datosTitular.identificacion,
           fechaInicio,
