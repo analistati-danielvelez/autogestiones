@@ -544,15 +544,14 @@ async function enviarCorreoConfirmacion(datos: {
   });
 }
 
-async function enviarCorreoAreaPazSalvo(datos: {
-    destinatario: string;
-    nombre: string;
-    identificacion: string;
-    contratosTexto: string;
-    productosTexto: string;
-    codigoSolicitud: string;
-    archivo: ArchivoAdjuntoCorreo;
-  }) {
+    async function enviarCorreoAreaPazSalvo(datos: {
+      nombre: string;
+      identificacion: string;
+      contratosTexto: string;
+      productosTexto: string;
+      codigoSolicitud: string;
+      archivo: ArchivoAdjuntoCorreo;
+    }) {
     const host = process.env.SMTP_HOST;
     const port = Number(process.env.SMTP_PORT || 465);
     const user = process.env.SMTP_USER;
@@ -575,7 +574,7 @@ async function enviarCorreoAreaPazSalvo(datos: {
   
     await transporter.sendMail({
       from: `"Cotrafa Social" <${from}>`,
-      to: datos.destinatario,
+      to: from,
       subject: `Paz y Salvo - ${datos.identificacion} - ${datos.codigoSolicitud}`,
       html: `
         <p>Cordial saludo,</p>
@@ -821,7 +820,6 @@ const archivoAdjunto =
 
     if (archivoParaCorreo) {
         await enviarCorreoAreaPazSalvo({
-            destinatario: "analistati@cotrafasocial.com.co",
             nombre: datosTitular.nombre,
             identificacion: datosTitular.identificacion,
             contratosTexto,
