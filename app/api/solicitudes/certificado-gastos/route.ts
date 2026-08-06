@@ -1034,7 +1034,7 @@ const fechaFallecimientoSolicitud =
       const destinoGastosTexto =
         String(destinoGastos).trim() === "interesado"
           ? "A quien pueda interesar"
-          : entidadFinancieraTexto;
+          : entidadFinancieraTexto || "Entidad no especificada";
 
     const datosDoc = JSON.stringify([
       {
