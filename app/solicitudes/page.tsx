@@ -681,15 +681,11 @@ export default function SolicitudesPage() {
         formData.append("archivoAdjunto", archivoAdjuntoDetallePago);
       }
 
-      const endpointSolicitud =
-        certificadoSeleccionado === "paz-salvo"
-          ? "/api/solicitudes/paz-salvo"
-          : "/api/solicitudes/detalle-pago";
-
-      const respuesta = await fetch(endpointSolicitud, {
+      const respuesta = await fetch("/api/solicitudes/detalle-pago", {
         method: "POST",
         body: formData,
       });
+
   
       const data = await respuesta.json();
   
@@ -714,51 +710,35 @@ export default function SolicitudesPage() {
     }
   };
 
-  const registrarSolicitudPazSalvo = async () => {
-    if (archivoAdjuntoDetallePago) {
-      const validacion = validarArchivoDetallePago(archivoAdjuntoDetallePago);
+  const enviarCertificadoPazSalvoCorreo = async () => {
+    const dirigidoA =
+      destinoCertificado === "interesado"
+        ? "A QUIEN PUEDA INTERESAR"
+        : entidadCertificado.trim();
   
-      if (!validacion.valido) {
-        alert(validacion.mensaje);
-        return;
-      }
+    const respuesta = await fetch("/api/certificados/paz-salvo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        identificacion: identificacion.trim(),
+        dirigidoA,
+        canal: "correo",
+      }),
+    });
+  
+    const data = await respuesta.json();
+  
+    if (data.estado === "empresarial") {
+      alert(data.message || MENSAJE_SOLICITUD_EMPRESARIAL);
+      return;
     }
   
-    setEnviandoDetallePago(true);
-  
-    try {
-      const formData = new FormData();
-  
-      formData.append("identificacion", identificacion.trim());
-  
-      if (archivoAdjuntoDetallePago) {
-        formData.append("archivoAdjunto", archivoAdjuntoDetallePago);
-      }
-  
-      const respuesta = await fetch("/api/solicitudes/paz-salvo", {
-        method: "POST",
-        body: formData,
-      });
-  
-      const data = await respuesta.json();
-  
-      if (!respuesta.ok) {
-        alert(data.message || "No fue posible registrar la solicitud de Paz y Salvo.");
-        return;
-      }
-  
-      alert(
-        "Solicitud enviada exitosamente.\n\nTu solicitud ha sido recibida y será validada por nuestro equipo. La respuesta será enviada al correo electrónico registrado dentro de los próximos tres (3) días hábiles."
-      );
-  
-      setMostrarModalPagosSolicitud(false);
-      setArchivoAdjuntoNombre("");
-      setArchivoAdjuntoDetallePago(null);
-    } catch (error) {
-      alert("No fue posible registrar la solicitud de Paz y Salvo en este momento.");
-    } finally {
-      setEnviandoDetallePago(false);
+    if (!respuesta.ok) {
+      alert(data.message || "No fue posible generar el certificado de Paz y Salvo.");
+      return;
     }
+  
+    alert(data.message || "El certificado fue enviado al correo registrado.");
   };
 
   const registrarSolicitudRetencionFuente = async () => {
@@ -1036,6 +1016,28 @@ export default function SolicitudesPage() {
         return;
       }
     }
+
+    if (certificadoSeleccionado === "paz-salvo") {
+      if (!destinoCertificado) {
+        alert("Por favor selecciona a quién va dirigido el certificado");
+        return;
+      }
+    
+      if (destinoCertificado === "entidad" && !entidadCertificado.trim()) {
+        alert("Por favor especifica la entidad");
+        return;
+      }
+    
+      if (
+        destinoCertificado === "entidad" &&
+        entidadCertificado.trim().length > LIMITE_CARACTERES_DIRIGIDO_A
+      ) {
+        alert(
+          `El campo dirigido a no puede superar los ${LIMITE_CARACTERES_DIRIGIDO_A} caracteres.`
+        );
+        return;
+      }
+    }
   
     if (certificadoSeleccionado === "afiliacion-fallecido") {
       if (!destinoCertificado) {
@@ -1073,7 +1075,15 @@ export default function SolicitudesPage() {
         setMostrarModalDestinoCertificado(false);
         return;
       }
-  
+      
+      if (certificadoSeleccionado === "paz-salvo") {
+        await enviarCertificadoPazSalvoCorreo();
+        setMostrarModalDestinoCertificado(false);
+        setDestinoCertificado("");
+        setEntidadCertificado("");
+        return;
+      }
+      
       if (certificadoSeleccionado === "red-descuentos") {
         await enviarCertificadoRedDescuentosCorreo();
         setMostrarModalDestinoCertificado(false);
@@ -1088,7 +1098,6 @@ export default function SolicitudesPage() {
   const requiereModalPagosSolicitud = () => {
     return (
       certificadoSeleccionado === "detalle-pago" ||
-      certificadoSeleccionado === "paz-salvo" ||
       certificadoSeleccionado === "copia-contrato" ||
       certificadoSeleccionado === "retencion-fuente"
     );
@@ -1098,11 +1107,6 @@ export default function SolicitudesPage() {
   
     if (certificadoSeleccionado === "detalle-pago") {
       registrarSolicitudDetallePago();
-      return;
-    }
-    
-    if (certificadoSeleccionado === "paz-salvo") {
-      registrarSolicitudPazSalvo();
       return;
     }
   
@@ -1453,7 +1457,13 @@ export default function SolicitudesPage() {
           className="bg-[#0090D1] px-10 py-6 font-bold text-white hover:bg-[#007bb3]"
           onClick={() => {
           
-          
+            if (certificadoSeleccionado === "paz-salvo") {
+              setDestinoCertificado("");
+              setEntidadCertificado("");
+              setMostrarModalDestinoCertificado(true);
+              return;
+            }
+
             if (certificadoSeleccionado === "afiliacion-fallecido") {
               setDocumentoBeneficiario("");
               setDestinoCertificado("");
@@ -1914,86 +1924,6 @@ export default function SolicitudesPage() {
   </>
 )}
 
-{certificadoSeleccionado === "paz-salvo" && (
-  <>
-    <div className="rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
-      <div className="flex items-start gap-3">
-        <Info className="mt-0.5 h-5 w-5 flex-none text-[#0090D1]" />
-        <p>{MENSAJE_INFORMATIVO_MODULO_DOS}</p>
-      </div>
-    </div>
-
-    <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5 text-left">
-      <h4 className="text-lg font-bold text-[#002869]">
-        Adjuntar documento de soporte (opcional)
-      </h4>
-
-      <p className="mt-2 text-sm text-gray-500">
-        Puedes adjuntar un soporte si deseas complementar la solicitud.
-      </p>
-
-      <div className="mt-5 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
-        <input
-          type="file"
-          id="archivoPazSalvo"
-          className="hidden"
-          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-          onChange={(e) => {
-            const archivo = e.target.files?.[0] || null;
-
-            if (!archivo) {
-              setArchivoAdjuntoDetallePago(null);
-              setArchivoAdjuntoNombre("");
-              return;
-            }
-
-            const validacion = validarArchivoDetallePago(archivo);
-
-            if (!validacion.valido) {
-              alert(validacion.mensaje);
-              e.target.value = "";
-              setArchivoAdjuntoDetallePago(null);
-              setArchivoAdjuntoNombre("");
-              return;
-            }
-
-            setArchivoAdjuntoDetallePago(archivo);
-            setArchivoAdjuntoNombre(archivo.name);
-          }}
-        />
-
-        <label
-          htmlFor="archivoPazSalvo"
-          className="inline-flex cursor-pointer items-center justify-center rounded-full bg-[#0090D1] px-6 py-3 font-bold text-white hover:bg-[#007bb3]"
-        >
-          Selecciona un archivo
-        </label>
-
-        <p className="mt-3 text-sm text-gray-500">
-          Formatos permitidos: PDF, JPG, PNG. Tamaño máximo: 15 MB
-        </p>
-
-        {archivoAdjuntoNombre && (
-          <div className="mt-4 flex items-center justify-center gap-3 rounded-xl border border-[#0090D1]/20 bg-white px-4 py-3 text-sm font-semibold text-[#002869]">
-            <span className="break-all">
-              Archivo seleccionado: {archivoAdjuntoNombre}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => limpiarArchivoAdjunto("archivoPazSalvo")}
-              className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-red-50 text-red-600 transition hover:bg-red-100"
-              title="Quitar archivo"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  </>
-)}
-
 {certificadoSeleccionado === "copia-contrato" && (
   <>
     <div className="rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
@@ -2039,8 +1969,7 @@ export default function SolicitudesPage() {
                 ? enviandoDetallePago
                   ? "Enviando..."
                   : "Solicitar certificado"
-                : certificadoSeleccionado === "detalle-pago" ||
-                    certificadoSeleccionado === "paz-salvo"
+                : certificadoSeleccionado === "detalle-pago"
                   ? enviandoDetallePago
                     ? "Enviando..."
                     : "Enviar solicitud"
