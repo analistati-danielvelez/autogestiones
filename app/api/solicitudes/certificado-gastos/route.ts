@@ -582,6 +582,7 @@ async function registrarSolicitudEnSheets(datos: {
 
 async function registrarSolicitudNivel2CertificadoGastos(datos: {
   fechaSolicitud: string;
+  lugarRetiro: string;
   cedulaTitular: string;
   nombreTitular: string;
   cedulaFallecido: string;
@@ -613,7 +614,7 @@ async function registrarSolicitudNivel2CertificadoGastos(datos: {
         [
           datos.fechaSolicitud,
           "APLICATIVO WEB",
-          "",
+          datos.lugarRetiro,
           "",
           datos.cedulaTitular,
           datos.nombreTitular,
@@ -861,10 +862,12 @@ async function enviarCorreoConfirmacion(datos: {
 export async function POST(request: Request) {
   try {
     const {
+      modo,
       identificacion,
       destinoGastos,
       entidadFinanciera,
       cedulaFallecido,
+      lugarRetiro,
     } = await request.json();
 
 
@@ -876,23 +879,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    if (!destinoGastos || !String(destinoGastos).trim()) {
-        return NextResponse.json(
-          { ok: false, message: "Debe seleccionar a quién va dirigido el certificado." },
-          { status: 400 }
-        );
-      }
-      
-      if (
-        String(destinoGastos).trim() === "entidad-financiera" &&
-        (!entidadFinanciera || !String(entidadFinanciera).trim())
-      ) {
-        return NextResponse.json(
-          { ok: false, message: "Debe ingresar alguna entidad." },
-          { status: 400 }
-        );
-      }
       
       if (!cedulaFallecido || !String(cedulaFallecido).trim()) {
         return NextResponse.json(
@@ -900,9 +886,6 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      
-
-
 
       const contratos = await consultarContratos(String(identificacion).trim());
 
@@ -959,24 +942,67 @@ export async function POST(request: Request) {
 
     let fallecidoRelacionado: FallecidoSolicitud | null = null;
 
-if (!esSolicitudEmpresarial) {
-  fallecidoRelacionado = await obtenerFallecidoEnContratos({
-    contratosExequiales,
-    identificacionTitular: String(identificacion).trim(),
-    documentoFallecido: String(cedulaFallecido).trim(),
-  });
+  if (!esSolicitudEmpresarial) {
+    fallecidoRelacionado = await obtenerFallecidoEnContratos({
+      contratosExequiales,
+      identificacionTitular: String(identificacion).trim(),
+      documentoFallecido: String(cedulaFallecido).trim(),
+    });
 
-  if (!fallecidoRelacionado) {
+    if (!fallecidoRelacionado) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "La identificación ingresada no corresponde a un beneficiario fallecido asociado al contrato.",
+        },
+        { status: 422 }
+      );
+    }
+  }
+
+  if (modo === "validar-fallecido") {
+    return NextResponse.json(
+      {
+        ok: true,
+        message: "Fallecido validado correctamente.",
+        fallecido: fallecidoRelacionado,
+      },
+      { status: 200 }
+    );
+  }
+
+  if (!destinoGastos || !String(destinoGastos).trim()) {
     return NextResponse.json(
       {
         ok: false,
-        message:
-          "La identificación ingresada no corresponde a un beneficiario fallecido asociado al contrato.",
+        message: "Debe seleccionar a quién va dirigido el certificado.",
       },
-      { status: 422 }
+      { status: 400 }
     );
   }
-}
+  
+  if (
+    String(destinoGastos).trim() === "entidad-financiera" &&
+    (!entidadFinanciera || !String(entidadFinanciera).trim())
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "Debe ingresar alguna entidad." },
+      { status: 400 }
+    );
+  }
+  
+  const lugarRetiroTexto = String(lugarRetiro || "").trim();
+  
+  if (!["Bello", "Rionegro"].includes(lugarRetiroTexto)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Debe seleccionar el lugar donde desea retirar el certificado.",
+      },
+      { status: 400 }
+    );
+  }
 
     if (!esSolicitudEmpresarial) {
       const contratosMorosos = await obtenerContratosMorosos(contratosExequiales);
@@ -1047,6 +1073,7 @@ const fechaFallecimientoSolicitud =
         productos: productosTexto,
         destinoGastos: destinoGastosTexto,
         entidadFinanciera: entidadFinancieraTexto,
+        lugarRetiro: lugarRetiroTexto,
         cedulaFallecido: String(cedulaFallecido).trim(),
         nombreFallecido: nombreFallecidoSolicitud,
         fechaFallecimiento: fechaFallecimientoSolicitud,
@@ -1066,6 +1093,7 @@ const fechaFallecimientoSolicitud =
 
       await registrarSolicitudNivel2CertificadoGastos({
         fechaSolicitud: obtenerFechaRegistroTexto(),
+        lugarRetiro: lugarRetiroTexto.toLocaleUpperCase("es-CO"),
         cedulaTitular:
           datosTitular.identificacion || String(identificacion).trim(),
         nombreTitular: datosTitular.nombre,
@@ -1095,7 +1123,7 @@ const fechaFallecimientoSolicitud =
         {
           ok: true,
           message:
-            "Solicitud enviada exitosamente.\n\nTu solicitud ha sido recibida y será validada por nuestro equipo. La respuesta será enviada al correo electrónico registrado dentro de los próximos tres (3) días hábiles.",
+            "Solicitud enviada exitosamente.\n\nTu solicitud ha sido recibida y será validada por nuestro equipo. Podrás retirarla físicamente en la sede seleccionada después de transcurridos tres (3) días hábiles.",
           codigoSolicitud,
         },
         { status: 200 }

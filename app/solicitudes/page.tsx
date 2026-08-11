@@ -7,15 +7,18 @@ import { Input } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 import { Autocomplete, AutocompleteItem } from "@heroui/autocomplete";
 import {
-    FileText,
-    CheckCircle2,
-    FileBadge,
-    ArrowLeft,
-    ShieldCheck,
-    BadgeDollarSign,
-    Info,
-    X,
-  } from "lucide-react";
+  FileText,
+  CheckCircle2,
+  FileBadge,
+  ArrowLeft,
+  ShieldCheck,
+  BadgeDollarSign,
+  Info,
+  X,
+  Landmark,
+  Building2,
+  MapPin,
+} from "lucide-react";
 
   declare global {
     interface Window {
@@ -75,6 +78,7 @@ export default function SolicitudesPage() {
   const [destinoGastos, setDestinoGastos] = useState("");
   const [entidadPensiones, setEntidadPensiones] = useState("");
   const [cedulaFallecido, setCedulaFallecido] = useState("");
+  const [lugarRetiroGastos, setLugarRetiroGastos] = useState("");
   const [nombreFallecido, setNombreFallecido] = useState("");
   const [fechaFallecimiento, setFechaFallecimiento] = useState("");
   const [buscandoNotaria, setBuscandoNotaria] = useState(false);
@@ -831,6 +835,11 @@ export default function SolicitudesPage() {
       alert("Por favor ingresa el número de identificación del fallecido.");
       return;
     }
+
+    if (!lugarRetiroGastos) {
+      alert("Por favor selecciona dónde deseas retirar el certificado.");
+      return;
+    }
   
   
     if (!entidadPensiones.trim()) {
@@ -855,7 +864,8 @@ export default function SolicitudesPage() {
           identificacion: identificacion.trim(),
           destinoGastos: "entidad-financiera",
           entidadFinanciera: entidadPensiones.trim(),
-              cedulaFallecido: cedulaFallecido.trim(),
+          cedulaFallecido: cedulaFallecido.trim(),
+          lugarRetiro: lugarRetiroGastos,
         }),
       });
   
@@ -879,12 +889,53 @@ export default function SolicitudesPage() {
       setDestinoGastos("");
       setEntidadPensiones("");
       setCedulaFallecido("");
+      setLugarRetiroGastos("");
       setNombreFallecido("");
       setFechaFallecimiento("");
     } catch (error) {
       alert(
         "No fue posible registrar la solicitud de certificado de gastos servicios funerarios en este momento."
       );
+    } finally {
+      setEnviandoDetallePago(false);
+    }
+  };
+
+  const validarFallecidoCertificadoGastos = async () => {
+    if (!cedulaFallecido.trim()) {
+      alert("Por favor ingresa el número de identificación del fallecido.");
+      return;
+    }
+  
+    setEnviandoDetallePago(true);
+  
+    try {
+      const respuesta = await fetch("/api/solicitudes/certificado-gastos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          modo: "validar-fallecido",
+          identificacion: identificacion.trim(),
+          cedulaFallecido: cedulaFallecido.trim(),
+        }),
+      });
+  
+      const data = await respuesta.json();
+  
+      if (!respuesta.ok || !data.ok) {
+        alert(
+          data.message ||
+            "La identificación ingresada no corresponde a un fallecido asociado al contrato."
+        );
+        return;
+      }
+  
+      setMostrarModalTipoGasto(false);
+      setMostrarModalTramites(true);
+    } catch (error) {
+      alert("No fue posible validar la información del fallecido en este momento.");
     } finally {
       setEnviandoDetallePago(false);
     }
@@ -1070,21 +1121,25 @@ export default function SolicitudesPage() {
 
 
   const requiereModalTramites = () => {
-    return (
-      certificadoSeleccionado === "certificado-gastos" ||
-      certificadoSeleccionado === "notaria-folio"
-    );
+    return certificadoSeleccionado === "notaria-folio";
   };
   
   const continuarDesdeCertificadoGastos = () => {
+    if (enviandoDetallePago) {
+      return;
+    }
+  
     if (!entidadPensiones.trim()) {
       alert("Por favor ingresa a quién va dirigido el certificado.");
       return;
     }
   
-    setDestinoGastos("entidad-financiera");
-    setMostrarModalTramites(false);
-    setMostrarModalTipoGasto(true);
+    if (!lugarRetiroGastos) {
+      alert("Por favor selecciona dónde deseas retirar el certificado.");
+      return;
+    }
+  
+    registrarSolicitudCertificadoGastos();
   };
   
   const buscarInformacionNotaria = async () => {
@@ -1421,10 +1476,23 @@ export default function SolicitudesPage() {
               return;
             }
 
+            if (certificadoSeleccionado === "certificado-gastos") {
+              setDestinoGastos("");
+              setEntidadPensiones("");
+              setCedulaFallecido("");
+              setLugarRetiroGastos("");
+              setNombreFallecido("");
+              setFechaFallecimiento("");
+              setResultadoNotaria(null);
+              setMostrarModalTipoGasto(true);
+              return;
+            }
+            
             if (requiereModalTramites()) {
               setDestinoGastos("");
               setEntidadPensiones("");
               setCedulaFallecido("");
+              setLugarRetiroGastos("");
               setNombreFallecido("");
               setFechaFallecimiento("");
               setResultadoNotaria(null);
@@ -1476,117 +1544,198 @@ export default function SolicitudesPage() {
 
       <div className="flex-1 overflow-y-auto px-5 py-6 text-center sm:px-6 sm:py-10">
       {certificadoSeleccionado === "certificado-gastos" && (
-  <>
-    <p className="text-xl font-semibold text-gray-500">
-      ¿A quién va dirigido el certificado?
-    </p>
-
-    <p className="mt-3 text-sm text-gray-500">
-      Escribe el nombre de la entidad, persona o destinatario que debe aparecer en el certificado.
-    </p>
-
-    <div className="mt-8 text-left">
-    <Input
-        type="text"
-        label="Dirigido a"
-        placeholder="Ej: Banco, aseguradora, entidad solicitante"
-        value={entidadPensiones}
-        maxLength={LIMITE_CARACTERES_DIRIGIDO_A}
-        description={`${entidadPensiones.length}/${LIMITE_CARACTERES_DIRIGIDO_A} caracteres`}
-        onChange={(e) => {
-          setDestinoGastos("entidad-financiera");
-          setEntidadPensiones(limitarDirigidoA(e.target.value));
-        }}
-        isRequired
-      />
-    </div>
-  </>
-)}
-
-        {certificadoSeleccionado === "notaria-folio" && (
           <>
             <p className="text-xl font-semibold text-gray-500">
-              Consulta de notaría y folio
+              ¿A quién va dirigido el certificado?
             </p>
 
             <p className="mt-3 text-sm text-gray-500">
-              Ingresa el número de identificacion del fallecido para consultar información asociada.
+              Escribe el nombre de la entidad, persona o destinatario que debe aparecer en el certificado.
             </p>
 
             <div className="mt-8 grid gap-5 text-left">
               <Input
                 type="text"
-                label="Número de identificacion del fallecido"
-                placeholder="Ej: 123456789"
-                value={cedulaFallecido}
+                label="Dirigido a"
+                placeholder="Ej: Banco, aseguradora, entidad solicitante"
+                value={entidadPensiones}
+                maxLength={LIMITE_CARACTERES_DIRIGIDO_A}
+                description={`${entidadPensiones.length}/${LIMITE_CARACTERES_DIRIGIDO_A} caracteres`}
                 onChange={(e) => {
-                  setCedulaFallecido(e.target.value);
-                  setResultadoNotaria(null);
+                  setDestinoGastos("entidad-financiera");
+                  setEntidadPensiones(limitarDirigidoA(e.target.value));
                 }}
                 isRequired
               />
-            </div>
 
-            <div className="mt-8">
-            <Button
-              className={`px-10 py-6 font-bold ${
-                buscandoNotaria
-                  ? "bg-gray-300 text-gray-500"
-                  : "bg-[#0090D1] text-white hover:bg-[#007bb3]"
-              }`}
-              onClick={buscarInformacionNotaria}
-              disabled={buscandoNotaria}
-            >
-              {buscandoNotaria ? "Buscando..." : "Buscar"}
-            </Button>
-            </div>
-
-            {resultadoNotaria?.encontrado && (
-              <div className="mt-8 rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-left text-sm text-green-800">
-                <p className="font-bold">Información encontrada</p>
-
-                <p className="mt-2">
-                  <span className="font-semibold">Nombre del fallecido:</span>{" "}
-                  {resultadoNotaria.nombreFallecido || "No disponible"}
-                </p>
-
-                <p className="mt-1">
-                  <span className="font-semibold">Cédula del fallecido:</span>{" "}
-                  {resultadoNotaria.cedulaFallecido || cedulaFallecido}
-                </p>
-
-                <p className="mt-1">
-                  <span className="font-semibold">Fecha de fallecimiento:</span>{" "}
-                  {resultadoNotaria.fechaFallecimiento || "No disponible"}
-                </p>
-
-                <p className="mt-1">
-                  <span className="font-semibold">Notaría:</span>{" "}
-                  {resultadoNotaria.notaria || "No disponible"}
-                </p>
-
-                <p className="mt-1">
-                <span className="font-semibold">Municipio:</span>{" "}
-                {resultadoNotaria.municipio || "No disponible"}
-                </p>
-
-                <p className="mt-1">
-                  <span className="font-semibold">
-                    Número de Folio del Registro de Defunción:
-                  </span>{" "}
-                  {resultadoNotaria.folio || "No disponible"}
-                </p>
+              <div>
+              <div className="mb-3 flex items-center gap-2 text-[#002869]">
+                <MapPin className="h-5 w-5" />
+                <h4 className="text-base font-bold">
+                  Lugar de retiro
+                </h4>
               </div>
-            )}
 
-            {resultadoNotaria && !resultadoNotaria.encontrado && (
-              <div className="mt-8 rounded-xl border border-red-100 bg-red-50 px-5 py-4 text-left text-sm text-red-700">
-                {resultadoNotaria.message ||
-                  "En este momento no encontramos información asociada a la consulta realizada. Para recibir acompañamiento, comunícate con nuestra linea de servicio al cliente 456 7000 ext 5."}
+                <p className="mb-4 text-sm text-gray-500">
+                  Selecciona la sede donde deseas realizar el retiro físico del documento.
+                </p>
+
+                <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4">
+                  <button
+                    type="button"
+                    onClick={() => setLugarRetiroGastos("Bello")}
+                    className={`flex w-full items-center gap-4 rounded-xl border px-4 py-3 text-left transition ${
+                      lugarRetiroGastos === "Bello"
+                        ? "border-[#002869] bg-[#F5FAFD]"
+                        : "border-gray-200 bg-white hover:border-[#0090D1]"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-5 w-5 flex-none items-center justify-center rounded-full border ${
+                        lugarRetiroGastos === "Bello"
+                          ? "border-[#002869] bg-[#002869]"
+                          : "border-gray-300 bg-white"
+                      }`}
+                    >
+                      {lugarRetiroGastos === "Bello" && (
+                        <span className="h-2 w-2 rounded-full bg-white" />
+                      )}
+                    </span>
+
+                    <Building2 className="h-7 w-7 flex-none text-[#002869]" />
+
+                      <span>
+                        <span className="block font-bold text-[#002869]">Bello</span>
+                        <span className="block text-sm text-gray-500">
+                          Sede Bello - Antioquia
+                      </span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLugarRetiroGastos("Rionegro")}
+                    className={`flex w-full items-center gap-4 rounded-xl border px-4 py-3 text-left transition ${
+                      lugarRetiroGastos === "Rionegro"
+                        ? "border-[#002869] bg-[#F5FAFD]"
+                        : "border-gray-200 bg-white hover:border-[#0090D1]"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-5 w-5 flex-none items-center justify-center rounded-full border ${
+                        lugarRetiroGastos === "Rionegro"
+                          ? "border-[#002869] bg-[#002869]"
+                          : "border-gray-300 bg-white"
+                      }`}
+                    >
+                      {lugarRetiroGastos === "Rionegro" && (
+                        <span className="h-2 w-2 rounded-full bg-white" />
+                      )}
+                    </span>
+
+                    <Landmark className="h-7 w-7 flex-none text-[#002869]" />
+
+                      <span>
+                      <span className="block font-bold text-[#002869]">Rionegro</span>
+                      <span className="block text-sm text-gray-500">
+                        Sede Rionegro - Antioquia
+                      </span>
+                    </span>
+                  </button>
+
+                  <div className="rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-4 py-3 text-sm text-[#002869]">
+                    El certificado estará disponible para retiro después de tres (3) días hábiles.
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
           </>
         )}
+
+{certificadoSeleccionado === "notaria-folio" && (
+  <>
+    <p className="text-xl font-semibold text-gray-500">
+      Consulta de notaría y folio
+    </p>
+
+    <p className="mt-3 text-sm text-gray-500">
+      Ingresa el número de identificación del fallecido para consultar información asociada.
+    </p>
+
+    <div className="mt-8 grid gap-5 text-left">
+      <Input
+        type="text"
+        label="Número de identificación del fallecido"
+        placeholder="Ej: 123456789"
+        value={cedulaFallecido}
+        onChange={(e) => {
+          setCedulaFallecido(e.target.value);
+          setResultadoNotaria(null);
+        }}
+        isRequired
+      />
+    </div>
+
+    <div className="mt-8">
+      <Button
+        className={`px-10 py-6 font-bold ${
+          buscandoNotaria
+            ? "bg-gray-300 text-gray-500"
+            : "bg-[#0090D1] text-white hover:bg-[#007bb3]"
+        }`}
+        onClick={buscarInformacionNotaria}
+        disabled={buscandoNotaria}
+      >
+        {buscandoNotaria ? "Buscando..." : "Buscar"}
+      </Button>
+    </div>
+
+    {resultadoNotaria?.encontrado && (
+      <div className="mt-8 rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-left text-sm text-green-800">
+        <p className="font-bold">Información encontrada</p>
+
+        <p className="mt-2">
+          <span className="font-semibold">Nombre del fallecido:</span>{" "}
+          {resultadoNotaria.nombreFallecido || "No disponible"}
+        </p>
+
+        <p className="mt-1">
+          <span className="font-semibold">Cédula del fallecido:</span>{" "}
+          {resultadoNotaria.cedulaFallecido || cedulaFallecido}
+        </p>
+
+        <p className="mt-1">
+          <span className="font-semibold">Fecha de fallecimiento:</span>{" "}
+          {resultadoNotaria.fechaFallecimiento || "No disponible"}
+        </p>
+
+        <p className="mt-1">
+          <span className="font-semibold">Notaría:</span>{" "}
+          {resultadoNotaria.notaria || "No disponible"}
+        </p>
+
+        <p className="mt-1">
+          <span className="font-semibold">Municipio:</span>{" "}
+          {resultadoNotaria.municipio || "No disponible"}
+        </p>
+
+        <p className="mt-1">
+          <span className="font-semibold">
+            Número de Folio del Registro de Defunción:
+          </span>{" "}
+          {resultadoNotaria.folio || "No disponible"}
+        </p>
+      </div>
+    )}
+
+    {resultadoNotaria && !resultadoNotaria.encontrado && (
+      <div className="mt-8 rounded-xl border border-red-100 bg-red-50 px-5 py-4 text-left text-sm text-red-700">
+        {resultadoNotaria.message ||
+          "En este momento no encontramos información asociada a la consulta realizada. Para recibir acompañamiento, comunícate con nuestra linea de servicio al cliente 456 7000 ext 5."}
+      </div>
+    )}
+  </>
+)}
       </div>
 
       <div className="shrink-0 flex flex-col justify-center gap-3 border-t border-gray-100 bg-white px-5 py-4 sm:flex-row sm:px-6 sm:py-5">
@@ -1598,13 +1747,18 @@ export default function SolicitudesPage() {
         </Button>
 
         {certificadoSeleccionado === "certificado-gastos" && (
-          <Button
-            className="w-full bg-[#0090D1] px-8 py-5 font-bold text-white hover:bg-[#007bb3] sm:w-auto sm:px-12 sm:py-6"
-            onClick={continuarDesdeCertificadoGastos}
-          >
-            Continuar
-          </Button>
-        )}
+            <Button
+              className={`w-full px-8 py-5 font-bold sm:w-auto sm:px-12 sm:py-6 ${
+                enviandoDetallePago
+                  ? "bg-gray-300 text-gray-500"
+                  : "bg-[#0090D1] text-white hover:bg-[#007bb3]"
+              }`}
+              onClick={continuarDesdeCertificadoGastos}
+              disabled={enviandoDetallePago}
+            >
+              {enviandoDetallePago ? "Enviando..." : "Enviar solicitud"}
+            </Button>
+          )}
 
         {certificadoSeleccionado === "notaria-folio" && (
           <Button
@@ -2446,27 +2600,30 @@ export default function SolicitudesPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-6 text-center sm:px-6 sm:py-10">
-        <div className="rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
-          <div className="flex items-start gap-3">
-            <Info className="mt-0.5 h-5 w-5 flex-none text-[#0090D1]" />
-            <p>{MENSAJE_INFORMATIVO_MODULO_DOS}</p>
-          </div>
-        </div>
+  <div className="rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
+    <div className="flex items-start gap-3">
+      <Info className="mt-0.5 h-5 w-5 flex-none text-[#0090D1]" />
+      <p>
+        Este certificado requiere validación por parte de nuestro equipo.
+        Podrás retirarlo físicamente en la sede seleccionada después de
+        <strong> transcurridos tres (3) días hábiles.</strong>
+      </p>
+    </div>
+  </div>
 
-        <div className="mt-8 grid gap-5 text-left">
-          <Input
-            type="text"
-            label="Número de identificación del fallecido"
-            placeholder="Ej: 123456789"
-            value={cedulaFallecido}
-            onChange={(e) => setCedulaFallecido(e.target.value)}
-            isRequired
-          />
-          
-        </div>
-      </div>
+  <div className="mt-8 grid gap-5 text-left">
+    <Input
+      type="text"
+      label="Número de identificación del fallecido"
+      placeholder="Ej: 123456789"
+      value={cedulaFallecido}
+      onChange={(e) => setCedulaFallecido(e.target.value)}
+      isRequired
+    />
+  </div>
+</div>
 
-      <div className="shrink-0 flex flex-col justify-center gap-3 border-t border-gray-100 bg-white px-5 py-4 sm:flex-row sm:px-6 sm:py-5">
+<div className="shrink-0 flex flex-col justify-center gap-3 border-t border-gray-100 bg-white px-5 py-4 sm:flex-row sm:px-6 sm:py-5">
         <Button
           className={`border border-[#002869] bg-white px-12 py-6 font-bold ${
             enviandoDetallePago ? "text-gray-400" : "text-[#002869]"
@@ -2474,7 +2631,6 @@ export default function SolicitudesPage() {
           onClick={() => {
             if (!enviandoDetallePago) {
               setMostrarModalTipoGasto(false);
-              setMostrarModalTramites(true);
             }
           }}
           disabled={enviandoDetallePago}
@@ -2488,10 +2644,10 @@ export default function SolicitudesPage() {
               ? "bg-gray-300 text-gray-500"
               : "bg-[#0090D1] text-white hover:bg-[#007bb3]"
           }`}
-          onClick={registrarSolicitudCertificadoGastos}
+          onClick={validarFallecidoCertificadoGastos}
           disabled={enviandoDetallePago}
         >
-          {enviandoDetallePago ? "Enviando..." : "Enviar solicitud"}
+          {enviandoDetallePago ? "Validando..." : "Continuar"}
         </Button>
       </div>
     </div>
