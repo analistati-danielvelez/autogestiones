@@ -698,9 +698,10 @@ function generarHtmlSolicitudCertificadoGastos(datos: {
                     </table>
 
                     <p style="margin:24px 0 0; color:#4b5563; font-size:15px; line-height:1.7;">
-                      En un plazo máximo de <strong>tres (3) días hábiles</strong>, te enviaremos una respuesta
-                      o actualización sobre el estado de tu trámite al último correo electrónico registrado
-                      en nuestro sistema, en caso de no recibir respuesta comunuicate al 456 7000.
+                      Tu certificado estará listo en un plazo máximo de
+                      <strong>tres (3) días hábiles</strong> y podrás reclamarlo de manera presencial
+                      en la oficina que seleccionaste. Si tienes alguna duda o inquietud, comunícate
+                      con nuestra línea de atención al cliente al <strong>456 7000</strong>.
                     </p>
 
                     <p style="margin:26px 0 0; color:#002869; font-size:15px; line-height:1.6; font-weight:700;">
