@@ -745,7 +745,7 @@ export default function SolicitudesPage() {
     setEnviandoDetallePago(true);
   
     try {
-      const respuesta = await fetch("/api/solicitudes/retencion-fuente", {
+      const respuesta = await fetch("/api/certificados/retencion-fuente", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
