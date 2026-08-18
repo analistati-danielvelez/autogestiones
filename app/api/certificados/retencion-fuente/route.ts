@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { google } from "googleapis";
-import QRCode from "qrcode";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import os from "os";
@@ -186,6 +184,13 @@ async function obtenerToken() {
 
   const token = textoRespuesta.replace(/^"|"$/g, "").trim();
 
+  console.log("TOKEN RETENCION DEBUG:", {
+    authUrl,
+    tokenLength: token.length,
+    tokenInicio: token.slice(0, 20),
+    tokenFin: token.slice(-20),
+  });
+
   if (!token) {
     throw new Error("Karing autenticó, pero no devolvió token.");
   }
@@ -233,7 +238,7 @@ function terceroEsProveedorValido(tercero: Record<string, unknown> | null) {
   const tipoOrganizacion = Number(tercero.tipo_organizacion);
   const estado = String(tercero.estado || "").trim().toUpperCase();
 
-  return tipoOrganizacion === 1 && estado === "A";
+  return [1, 2].includes(tipoOrganizacion) && estado === "A";
 }
 
 async function consultarProveedorValido(
@@ -253,14 +258,12 @@ async function consultarProveedorValido(
   };
 }
 
-async function consultarContratos(identificacion: string) {
+async function consultarContratos(identificacion: string, token: string) {
   const contratosUrl = process.env.KARING_CONTRATOS_URL;
 
   if (!contratosUrl) {
     throw new Error("Falta configurar KARING_CONTRATOS_URL.");
   }
-
-  const token = await obtenerToken();
 
   const urlConsulta = new URL(contratosUrl);
   urlConsulta.searchParams.set("identificacion", identificacion);
@@ -357,8 +360,10 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
   );
 }
 
-async function obtenerPlanesExequiales(contratosExequiales: ContratoKaring[]) {
-  const token = await obtenerToken();
+async function obtenerPlanesExequiales(
+  contratosExequiales: ContratoKaring[],
+  token: string
+) {
   const planes: PlanExequialSolicitud[] = [];
 
   for (const contrato of contratosExequiales) {
@@ -506,6 +511,7 @@ async function registrarSolicitudNivel2RetencionFuente(datos: {
 
 function generarHtmlCorreoCertificadoRetencion(datos: {
   nombreAfiliado: string;
+  codigoAutenticidad?: string;
 }) {
   const urlBase =
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -551,6 +557,23 @@ function generarHtmlCorreoCertificadoRetencion(datos: {
                       Lo encontrarás adjunto en este correo para que puedas consultarlo,
                       descargarlo o compartirlo cuando lo necesites.
                     </p>
+                    ${
+                      datos.codigoAutenticidad
+                        ? `
+                          <p style="margin:18px 0 0; color:#4b5563; font-size:14px; line-height:1.7;">
+                            Código de autenticidad:
+                            <strong style="color:#002869;">${datos.codigoAutenticidad}</strong>
+                          </p>
+                          <p style="margin:10px 0 0; color:#4b5563; font-size:13px; line-height:1.7;">
+                            Puedes validar este documento en:
+                            <br />
+                            <strong style="color:#002869;">
+                              ${urlBase}/validar-documento?codigo=${encodeURIComponent(datos.codigoAutenticidad)}
+                            </strong>
+                          </p>
+                        `
+                        : ""
+                    }
 
                     <p style="margin:26px 0 0; color:#002869; font-size:15px; line-height:1.6; font-weight:700;">
                       Cotrafa Social
@@ -659,6 +682,7 @@ async function enviarCertificadoPorCorreo(datos: {
   destinatario: string;
   nombreAfiliado: string;
   pdfBytes: Buffer;
+  codigoAutenticidad?: string;
 }) {
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 465);
@@ -686,6 +710,7 @@ async function enviarCertificadoPorCorreo(datos: {
     subject: "Certificado de Retención en la fuente",
     html: generarHtmlCorreoCertificadoRetencion({
       nombreAfiliado: datos.nombreAfiliado,
+      codigoAutenticidad: datos.codigoAutenticidad,
     }),
     attachments: [
       {
@@ -788,26 +813,41 @@ async function consultarPdfRetencionKaring(datos: {
 
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
-
+  
+  const encabezado = buffer.subarray(0, 20).toString("utf8");
+  const textoDebug = buffer.subarray(0, 500).toString("utf8");
+  
+  console.log("GETINFORMES RETENCION DEBUG:", {
+    url: urlConsulta.toString(),
+    status: response.status,
+    ok: response.ok,
+    contentType: response.headers.get("content-type"),
+    contentLength: response.headers.get("content-length"),
+    bufferLength: buffer.length,
+    encabezado,
+    textoDebug,
+  });
+  
   if (!response.ok || buffer.length === 0) {
     return null;
   }
-
-  const encabezado = buffer.subarray(0, 5).toString("utf8");
-
-  if (encabezado !== "%PDF-") {
+  
+  if (!buffer.subarray(0, 5).toString("utf8").startsWith("%PDF-")) {
     return null;
   }
-
+  
   return buffer;
 }
 
-async function desencriptarPdfConQpdf(pdfBytes: Buffer) {
+
+
+async function desencriptarPdfSinClave(pdfBytes: Buffer) {
   const password = process.env.RETENCION_PDF_PASSWORD || "811017024";
+
   const carpetaTemporal = await fs.mkdtemp(path.join(os.tmpdir(), "retencion-"));
 
   const entrada = path.join(carpetaTemporal, "entrada.pdf");
-  const salida = path.join(carpetaTemporal, "salida.pdf");
+  const salida = path.join(carpetaTemporal, "salida-sin-clave.pdf");
 
   try {
     await fs.writeFile(entrada, new Uint8Array(pdfBytes));
@@ -819,70 +859,19 @@ async function desencriptarPdfConQpdf(pdfBytes: Buffer) {
       salida,
     ]);
 
-    return await fs.readFile(salida);
+    const pdfSinClave = await fs.readFile(salida);
+
+    if (!pdfSinClave.subarray(0, 5).toString("utf8").startsWith("%PDF-")) {
+      throw new Error("qpdf generó una salida que no parece PDF.");
+    }
+
+    return pdfSinClave;
   } finally {
     await fs.rm(carpetaTemporal, { recursive: true, force: true });
   }
 }
 
-async function agregarQrAlPdf(datos: {
-  pdfBytes: Buffer;
-  codigoAutenticidad: string;
-}) {
-  const pdfDesencriptado = await desencriptarPdfConQpdf(datos.pdfBytes);
 
-  const pdfDoc = await PDFDocument.load(new Uint8Array(pdfDesencriptado));
-  const paginas = pdfDoc.getPages();
-
-  if (paginas.length === 0) {
-    throw new Error("El PDF de retención no contiene páginas.");
-  }
-
-  const ultimaPagina = paginas[paginas.length - 1];
-  const { width } = ultimaPagina.getSize();
-
-  const urlBaseValidacion =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "https://test-autosolicitudes.cotrafasocial.com";
-
-  const urlValidacion = `${urlBaseValidacion}/validar-documento?codigo=${encodeURIComponent(
-    datos.codigoAutenticidad
-  )}`;
-
-  const qrDataUrl = await QRCode.toDataURL(urlValidacion, {
-    errorCorrectionLevel: "H",
-    margin: 1,
-    width: 120,
-  });
-
-  const qrBase64 = qrDataUrl.split(",")[1];
-  const qrImage = await pdfDoc.embedPng(
-    new Uint8Array(Buffer.from(qrBase64, "base64"))
-  );
-  const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-  const qrSize = 58;
-  const x = width - 95;
-  const y = 28;
-
-  ultimaPagina.drawImage(qrImage, {
-    x,
-    y: y + 14,
-    width: qrSize,
-    height: qrSize,
-  });
-
-  ultimaPagina.drawText("Código de autenticidad", {
-    x: x - 8,
-    y,
-    size: 7,
-    font,
-    color: rgb(0, 0.156, 0.412),
-  });
-
-  const pdfFinal = await pdfDoc.save();
-  return Buffer.from(pdfFinal);
-}
 
 async function registrarSolicitudManualRetencion(datos: {
   identificacionTexto: string;
@@ -992,7 +981,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const contratos = await consultarContratos(identificacionTexto);
+    const contratos = await consultarContratos(identificacionTexto, token);
     const contratosEmpresariales = obtenerContratosEmpresarialesActivos(contratos);
     const contratosExequiales = obtenerContratosExequiales(contratos);
 
@@ -1001,7 +990,7 @@ export async function POST(request: Request) {
         ? contratosEmpresariales
         : contratosExequiales;
 
-    const planes = await obtenerPlanesExequiales(contratosBase);
+        const planes = await obtenerPlanesExequiales(contratosBase, token);
 
     const contratosTexto =
       planes.length > 0
@@ -1025,10 +1014,17 @@ export async function POST(request: Request) {
 
       const codigoAutenticidad = generarCodigoAutenticidad();
 
-      const pdfConQr = await agregarQrAlPdf({
-        pdfBytes: pdfKaring,
-        codigoAutenticidad,
-      });
+      let pdfConQr = pdfKaring;
+      
+      try {
+        pdfConQr = await desencriptarPdfSinClave(pdfKaring);
+        console.log("RETENCION PDF: se enviará PDF sin clave.");
+      } catch (errorDesencriptar) {
+        console.error(
+          "RETENCION PDF: no fue posible quitar la clave. Se enviará el PDF original de Karing:",
+          errorDesencriptar
+        );
+      }
 
       const datosDoc = JSON.stringify([
         {
@@ -1058,6 +1054,7 @@ export async function POST(request: Request) {
         destinatario: proveedor.email,
         nombreAfiliado: proveedor.nombre,
         pdfBytes: pdfConQr,
+        codigoAutenticidad,
       });
 
       return NextResponse.json(
@@ -1066,7 +1063,6 @@ export async function POST(request: Request) {
           estado: "generado",
           message:
             "Tu certificado de Retención en la fuente fue generado exitosamente y enviado al correo electrónico registrado.",
-          codigoAutenticidad,
         },
         { status: 200 }
       );
@@ -1076,20 +1072,19 @@ export async function POST(request: Request) {
         errorPdf
       );
 
-      const codigoSolicitud = await registrarSolicitudManualRetencion({
+      await registrarSolicitudManualRetencion({
         identificacionTexto,
         proveedor,
         contratosTexto,
         productosTexto,
       });
-
+      
       return NextResponse.json(
         {
           ok: true,
           estado: "solicitud",
           message:
             "Solicitud enviada exitosamente.\n\nNo fue posible generar automáticamente el certificado en este momento. Tu solicitud ha sido recibida y será validada por nuestro equipo.",
-          codigoSolicitud,
         },
         { status: 200 }
       );
