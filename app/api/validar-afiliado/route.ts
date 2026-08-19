@@ -261,14 +261,6 @@ function contratoEsEmpresarial(contrato: ContratoKaring) {
         token
       );
       
-      if (esProveedorValido) {
-        return NextResponse.json({
-          ok: true,
-          tipoUsuario: "proveedor",
-          message: "Proveedor validado correctamente.",
-        });
-      }
-
       const urlConsulta = new URL(contratosUrl);
 
       urlConsulta.searchParams.set("identificacion", identificacionTexto);
