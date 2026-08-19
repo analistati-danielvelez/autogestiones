@@ -364,17 +364,15 @@ export default function SolicitudesPage() {
       : productosCertificados;
 
       const opcionesDisponiblesPorProducto: Record<
-      string,
-      { id: string; label: string }[]
-    > =
-      tipoUsuarioValidado === "proveedor"
-        ? {
-            contrato: opcionesPorProducto.contrato.filter(
-              (opcion) => opcion.id === "retencion-fuente"
-            ),
-          }
-        : tipoUsuarioValidado === "afiliado-proveedor"
-          ? opcionesPorProducto
+        string,
+        { id: string; label: string }[]
+      > =
+        tipoUsuarioValidado === "proveedor"
+          ? {
+              contrato: opcionesPorProducto.contrato.filter(
+                (opcion) => opcion.id === "retencion-fuente"
+              ),
+            }
           : {
               ...opcionesPorProducto,
               contrato: opcionesPorProducto.contrato.filter(
@@ -1326,7 +1324,7 @@ export default function SolicitudesPage() {
         </h1>
 
         <p className="mt-2 text-gray-600">
-          Afiliado validado:{" "}
+          Usuario validado:{" "}
           <span className="font-semibold text-[#002869]">
             {tipoDocumento} {identificacion}
           </span>
