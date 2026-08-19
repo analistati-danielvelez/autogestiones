@@ -1241,6 +1241,29 @@ async function enviarCertificadoPorCorreo(datos: {
   });
 }
 
+function normalizarEntidadConvenio(valor: string) {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+function obtenerCodigoConvenioRedDescuentos(dirigidoA: string) {
+  const entidad = normalizarEntidadConvenio(dirigidoA);
+
+  if (entidad === "SMARTFIT") {
+    return "COTRAFASOCIAL2025";
+  }
+
+  if (entidad === "GATITUD") {
+    return "Cotrafasocial";
+  }
+
+  return null;
+}
+
 async function generarPdfRedDescuentos(datos: {
   nombre: string;
   tipoIdentificacion: string;
@@ -1264,6 +1287,8 @@ async function generarPdfRedDescuentos(datos: {
   const piePaginaUrl = `data:image/jpeg;base64,${piePaginaBase64}`;
 
   const generoNormalizado = datos.genero?.trim().toUpperCase();
+
+  const codigoConvenio = obtenerCodigoConvenioRedDescuentos(datos.dirigidoA);
 
 const textoCertificacion =
   generoNormalizado === "M"
@@ -1372,6 +1397,24 @@ const textoCertificacion =
 
           .content p {
             margin: 0 0 24px;
+          }
+
+          .codigo-convenio {
+            margin-top: 2px;
+            margin-bottom: 18px;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #5a5a5a;
+          }
+
+          .codigo-convenio strong {
+            color: #002869;
+          }
+
+          .codigo-convenio .valor {
+            margin-left: 10px;
+            color: #5a5a5a;
+            font-weight: 700;
           }
 
           .observation {
@@ -1500,6 +1543,17 @@ const textoCertificacion =
               <strong>${obtenerFechaActualTexto()}</strong>.
             </p>
           </div>
+
+          ${
+            codigoConvenio
+              ? `
+                <div class="codigo-convenio">
+                  <strong>Código del convenio:</strong>
+                  <span class="valor">${codigoConvenio}</span>
+                </div>
+              `
+              : ""
+          }
 
           <div class="observation">
             <strong>Observación:</strong>
