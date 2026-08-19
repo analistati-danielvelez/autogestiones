@@ -35,6 +35,10 @@ const LIMITE_DIARIO_AFILIACION_FALLECIDO = 3;
     fechaFallecimiento: string;
     parentesco: string;
     genero: string | null;
+    esTitularFallecido: boolean;
+    titularHistoricoNombre: string | null;
+    titularHistoricoTipoIdentificacion: string | null;
+    titularHistoricoIdentificacion: string | null;
   };
 
   type ContratoMoroso = {
@@ -355,20 +359,47 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
       return null;
     }
   
-    const soloFecha = fechaTexto.split("T")[0];
-    const partes = soloFecha.split("-").map(Number);
+    const texto = fechaTexto.trim();
   
-    if (partes.length !== 3) {
+    if (!texto) {
       return null;
     }
   
-    const [anio, mes, dia] = partes;
+    // Formato ISO: 2021-06-22 o 2021-06-22T00:00:00
+    const soloFechaIso = texto.split("T")[0];
+    const partesIso = soloFechaIso.split("-").map(Number);
   
-    if (!anio || !mes || !dia) {
-      return null;
+    if (partesIso.length === 3) {
+      const [anio, mes, dia] = partesIso;
+  
+      if (anio && mes && dia) {
+        return new Date(anio, mes - 1, dia);
+      }
     }
   
-    return new Date(anio, mes - 1, dia);
+    // Formato Karing visual: 22/06/2021 o 22/06/2021 12:00 a. m.
+    const soloFechaSlash = texto.split(" ")[0];
+    const partesSlash = soloFechaSlash.split("/").map(Number);
+  
+    if (partesSlash.length === 3) {
+      const [dia, mes, anio] = partesSlash;
+  
+      if (anio && mes && dia) {
+        return new Date(anio, mes - 1, dia);
+      }
+    }
+  
+    const fechaFallback = new Date(texto);
+  
+    if (!isNaN(fechaFallback.getTime())) {
+      return new Date(
+        fechaFallback.getFullYear(),
+        fechaFallback.getMonth(),
+        fechaFallback.getDate()
+      );
+    }
+  
+    return null;
   }
 
   function formatearFechaCorta(fechaTexto: string | null) {
@@ -426,6 +457,198 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
       .join(" ")
       .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function valorNormalizadoMayuscula(valor: unknown) {
+    return String(valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toUpperCase();
+  }
+  
+  function personaEsTitularHistorico(
+    persona: Record<string, unknown>,
+    identificacionTitularActual: string
+  ) {
+    const identificacion = obtenerTexto(persona.identificacion);
+  
+    const campos = [
+      persona.adicional,
+      persona.parentesco,
+      persona.tipo,
+      persona.tipo_asegurado,
+      persona.tipo_beneficiario,
+      persona.descripcion_parentesco,
+      persona.parentesco_descripcion,
+    ];
+  
+    const algunCampoDiceTitular = campos.some((campo) => {
+      const texto = valorNormalizadoMayuscula(campo);
+  
+      return (
+        texto === "T" ||
+        texto === "7" ||
+        texto === "TITULAR" ||
+        texto.includes("TITULAR")
+      );
+    });
+  
+    return (
+      algunCampoDiceTitular ||
+      normalizarDocumento(identificacion) ===
+        normalizarDocumento(identificacionTitularActual)
+    );
+  }
+
+  function obtenerTitularHistoricoEnFecha(
+    asegurados: unknown[],
+    fechaFallecimiento: string,
+    identificacionTitularActual: string,
+    fechaAfiliacionFallecido?: string | null,
+    documentoFallecido?: string | null
+  ) {
+    const fechaReferencia = obtenerFechaLocalSinDesfase(fechaFallecimiento);
+    const fechaIngresoFallecido =
+      obtenerFechaLocalSinDesfase(fechaAfiliacionFallecido || null);
+    const documentoFallecidoNormalizado = normalizarDocumento(documentoFallecido || null);
+  
+    if (!fechaReferencia || isNaN(fechaReferencia.getTime())) {
+      return null;
+    }
+  
+    const candidatos = asegurados
+      .filter((asegurado) => {
+        if (
+          !asegurado ||
+          typeof asegurado !== "object" ||
+          Array.isArray(asegurado)
+        ) {
+          return false;
+        }
+  
+        const persona = asegurado as Record<string, unknown>;
+  
+        const identificacion = obtenerTexto(persona.identificacion);
+        const fechaAfiliacion = obtenerTexto(persona.fecha_afiliacion);
+  
+        if (!identificacion || !fechaAfiliacion) {
+          return false;
+        }
+  
+        if (
+          documentoFallecidoNormalizado &&
+          normalizarDocumento(identificacion) === documentoFallecidoNormalizado
+        ) {
+          return false;
+        }
+  
+        const fechaInicio = obtenerFechaLocalSinDesfase(fechaAfiliacion);
+  
+        if (!fechaInicio || isNaN(fechaInicio.getTime())) {
+          return false;
+        }
+  
+        if (fechaInicio > fechaReferencia) {
+          return false;
+        }
+  
+        const fechaRetiro = obtenerFechaLocalSinDesfase(
+          obtenerTexto(persona.fecha_retiro)
+        );
+  
+        const fechaFallecio = obtenerFechaLocalSinDesfase(
+          obtenerTexto(persona.fecha_fallecio)
+        );
+  
+        if (
+          fechaRetiro &&
+          !isNaN(fechaRetiro.getTime()) &&
+          fechaRetiro < fechaReferencia
+        ) {
+          return false;
+        }
+  
+        if (
+          fechaFallecio &&
+          !isNaN(fechaFallecio.getTime()) &&
+          fechaFallecio < fechaReferencia
+        ) {
+          return false;
+        }
+  
+        return true;
+      })
+      .map((asegurado) => {
+        const persona = asegurado as Record<string, unknown>;
+  
+        const fechaInicio = obtenerFechaLocalSinDesfase(
+          obtenerTexto(persona.fecha_afiliacion)
+        );
+  
+        const fechaFallecio = obtenerFechaLocalSinDesfase(
+          obtenerTexto(persona.fecha_fallecio)
+        );
+  
+        const esTitular = personaEsTitularHistorico(
+          persona,
+          identificacionTitularActual
+        );
+  
+        const mismaFechaAfiliacion =
+          fechaIngresoFallecido &&
+          fechaInicio &&
+          fechaInicio.getFullYear() === fechaIngresoFallecido.getFullYear() &&
+          fechaInicio.getMonth() === fechaIngresoFallecido.getMonth() &&
+          fechaInicio.getDate() === fechaIngresoFallecido.getDate();
+  
+        const fallecioDespuesDelFallecido =
+          fechaFallecio &&
+          !isNaN(fechaFallecio.getTime()) &&
+          fechaFallecio >= fechaReferencia;
+  
+        const prioridad =
+          (esTitular ? 1000 : 0) +
+          (mismaFechaAfiliacion ? 100 : 0) +
+          (fallecioDespuesDelFallecido ? 50 : 0);
+  
+        return {
+          persona,
+          fechaInicio,
+          prioridad,
+        };
+      })
+      .sort((a, b) => {
+        if (b.prioridad !== a.prioridad) {
+          return b.prioridad - a.prioridad;
+        }
+  
+        return (
+          (b.fechaInicio?.getTime() || 0) - (a.fechaInicio?.getTime() || 0)
+        );
+      });
+  
+    if (candidatos.length === 0) {
+      return null;
+    }
+  
+    const titular = candidatos[0].persona;
+  
+    const nombreCompleto = obtenerNombreCompletoPersona(titular);
+    const identificacion = obtenerTexto(titular.identificacion);
+    const tipoIdentificacionCodigo = obtenerTexto(titular.tipo_identificacion);
+  
+    if (!nombreCompleto || !identificacion) {
+      return null;
+    }
+  
+    return {
+      nombre: nombreCompleto,
+      tipoIdentificacion:
+        obtenerTipoIdentificacionTexto(tipoIdentificacionCodigo) ||
+        "documento de identidad",
+      identificacion,
+    };
   }
   
   function obtenerParentescoTexto(codigo: string | null) {
@@ -600,26 +823,44 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
     >;
   
     const nombreCompleto = obtenerNombreCompletoPersona(registro);
-    const identificacion = obtenerTexto(registro.identificacion);
-    const tipoIdentificacionCodigo = obtenerTexto(registro.tipo_identificacion);
-    const fechaAfiliacion = obtenerTexto(registro.fecha_afiliacion);
-    const fechaFallecio = obtenerTexto(registro.fecha_fallecio);
+const identificacion = obtenerTexto(registro.identificacion);
+const tipoIdentificacionCodigo = obtenerTexto(registro.tipo_identificacion);
+const fechaAfiliacion = obtenerTexto(registro.fecha_afiliacion);
+const fechaFallecio = obtenerTexto(registro.fecha_fallecio);
+
+if (!nombreCompleto || !identificacion || !fechaFallecio) {
+  return null;
+}
+
+const esTitularFallecido = personaEsTitularHistorico(
+  registro,
+  identificacionTitular
+);
+
+const titularHistorico = obtenerTitularHistoricoEnFecha(
+  asegurados,
+  fechaFallecio,
+  identificacionTitular,
+  fechaAfiliacion,
+  identificacion
+);
   
-    if (!nombreCompleto || !identificacion || !fechaFallecio) {
-      return null;
-    }
-  
-    return {
-      nombreCompleto,
-      tipoIdentificacion:
-        obtenerTipoIdentificacionTexto(tipoIdentificacionCodigo) ||
-        "documento de identidad",
-      identificacion,
-      fechaAfiliacion: formatearFechaLarga(fechaAfiliacion),
-      fechaFallecimiento: formatearFechaLarga(fechaFallecio),
-      parentesco: obtenerParentescoTexto(obtenerTexto(registro.parentesco)),
-      genero: obtenerTexto(registro.genero),
-    };
+  return {
+    nombreCompleto,
+    tipoIdentificacion:
+      obtenerTipoIdentificacionTexto(tipoIdentificacionCodigo) ||
+      "documento de identidad",
+    identificacion,
+    fechaAfiliacion: formatearFechaLarga(fechaAfiliacion),
+    fechaFallecimiento: formatearFechaLarga(fechaFallecio),
+    parentesco: obtenerParentescoTexto(obtenerTexto(registro.parentesco)),
+    genero: obtenerTexto(registro.genero),
+    esTitularFallecido,
+    titularHistoricoNombre: titularHistorico?.nombre || null,
+    titularHistoricoTipoIdentificacion:
+      titularHistorico?.tipoIdentificacion || null,
+    titularHistoricoIdentificacion: titularHistorico?.identificacion || null,
+  };
   }
 
   async function obtenerFallecidoEnContratos(params: {
@@ -1370,6 +1611,7 @@ async function generarPdfAfiliacionFallecido(datos: {
     fechaFallecimiento: string;
     dirigidoA: string;
     codigoAutenticidad: string;
+    esTitularFallecido: boolean;
   }) {
     const logoBase64 = fs
       .readFileSync(path.join(process.cwd(), "public", "certificados", "LOGO.png"))
@@ -1395,6 +1637,32 @@ async function generarPdfAfiliacionFallecido(datos: {
       margin: 1,
       width: 120,
     });
+
+    const textoCertifica = datos.esTitularFallecido
+    ? `
+      <p>
+        <strong>${datos.nombreFallecido}</strong>, identificado(a) con
+        ${datos.tipoIdentificacionFallecido} No.
+        <strong>${datos.identificacionFallecido}</strong>, fallecido(a)
+        el día <strong>${datos.fechaFallecimiento}</strong>, se encontraba afiliado(a)
+        como <strong>TITULAR</strong> del <strong>${datos.producto}</strong>,
+        con contrato número <strong>${datos.contrato}</strong>, desde el día
+        <strong>${datos.fechaIngresoPlan || "No disponible"}</strong>.
+      </p>
+    `
+    : `
+      <p>
+        <strong>${datos.nombreFallecido}</strong>, identificado(a) con
+        ${datos.tipoIdentificacionFallecido} No.
+        <strong>${datos.identificacionFallecido}</strong>, se encontraba afiliado
+        como beneficiario del(a) señor(a)
+        <strong>${datos.nombreTitular}</strong>, identificado(a) con
+        ${datos.tipoIdentificacionTitular} No.
+        <strong>${datos.identificacionTitular}</strong>, en el
+        <strong>${datos.producto}</strong>, bajo el contrato No.
+        <strong>${datos.contrato}</strong>.
+      </p>
+    `;
   
     const html = `
     <!doctype html>
@@ -1603,17 +1871,7 @@ async function generarPdfAfiliacionFallecido(datos: {
           </div>
   
           <div class="content">
-            <p>
-              <strong>${datos.nombreFallecido}</strong>, identificado(a) con
-              ${datos.tipoIdentificacionFallecido} No.
-              <strong>${datos.identificacionFallecido}</strong>, se encontraba afiliado
-              como beneficiario del(a) señor(a)
-              <strong>${datos.nombreTitular}</strong>, identificado(a) con
-              ${datos.tipoIdentificacionTitular} No.
-              <strong>${datos.identificacionTitular}</strong>, en el
-              <strong>${datos.producto}</strong>, bajo el contrato No.
-              <strong>${datos.contrato}</strong>.
-            </p>
+            ${textoCertifica}
   
             <p>
               Para los fines legales y pertinentes que le interesen al solicitante, se acredita
@@ -2016,15 +2274,21 @@ async function generarPdfAfiliacionFallecido(datos: {
         tipoIdentificacionFallecido:
           resultadoFallecido.fallecido.tipoIdentificacion,
         identificacionFallecido: resultadoFallecido.fallecido.identificacion,
-        nombreTitular: datosTitular.nombre,
-        tipoIdentificacionTitular: datosTitular.tipoIdentificacion,
-        identificacionTitular: datosTitular.identificacion,
+        nombreTitular:
+        resultadoFallecido.fallecido.titularHistoricoNombre || datosTitular.nombre,
+      tipoIdentificacionTitular:
+        resultadoFallecido.fallecido.titularHistoricoTipoIdentificacion ||
+        datosTitular.tipoIdentificacion,
+      identificacionTitular:
+        resultadoFallecido.fallecido.titularHistoricoIdentificacion ||
+        datosTitular.identificacion,
         contrato: resultadoFallecido.contrato,
         producto: resultadoFallecido.producto,
         fechaIngresoPlan: resultadoFallecido.fallecido.fechaAfiliacion,
         fechaFallecimiento: resultadoFallecido.fallecido.fechaFallecimiento,
         dirigidoA: dirigidoATexto,
         codigoAutenticidad,
+        esTitularFallecido: resultadoFallecido.fallecido.esTitularFallecido,
       });
   
       if (canalSolicitud === "correo") {

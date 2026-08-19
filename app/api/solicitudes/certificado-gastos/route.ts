@@ -171,7 +171,6 @@ function contratoTieneCartera(contrato: ContratoKaring) {
     }
   
     const documentoBuscado = normalizarDocumento(documentoFallecido);
-    const documentoTitular = normalizarDocumento(identificacionTitular);
   
     const coincidencias = asegurados.filter((asegurado) => {
       if (
@@ -185,7 +184,6 @@ function contratoTieneCartera(contrato: ContratoKaring) {
       const persona = asegurado as Record<string, unknown>;
   
       const identificacion = obtenerTexto(persona.identificacion);
-      const adicional = obtenerTexto(persona.adicional);
       const fechaFallecio = obtenerTexto(persona.fecha_fallecio);
   
       if (!identificacion) {
@@ -193,14 +191,6 @@ function contratoTieneCartera(contrato: ContratoKaring) {
       }
   
       if (normalizarDocumento(identificacion) !== documentoBuscado) {
-        return false;
-      }
-  
-      if (normalizarDocumento(identificacion) === documentoTitular) {
-        return false;
-      }
-  
-      if (adicional?.trim().toUpperCase() === "T") {
         return false;
       }
   

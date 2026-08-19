@@ -1933,16 +1933,20 @@ export default function SolicitudesPage() {
   </>
 )}
 
-        {certificadoSeleccionado === "retencion-fuente" && (
-          <>
-            <div className="rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
-              <div className="flex items-start gap-3">
-                <Info className="mt-0.5 h-5 w-5 flex-none text-[#0090D1]" />
-                <p>{MENSAJE_INFORMATIVO_MODULO_DOS}</p>
-              </div>
-            </div>
-          </>
-        )}
+{certificadoSeleccionado === "retencion-fuente" && (
+  <>
+    <div className="rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
+      <div className="flex items-start gap-3">
+        <Info className="mt-0.5 h-5 w-5 flex-none text-[#0090D1]" />
+        <p>
+          Tu solicitud está siendo procesada. Por favor, espera un momento
+          mientras generamos tu certificado. Una vez esté listo, será enviado
+          al correo electrónico registrado en nuestros sistemas.
+        </p>
+      </div>
+    </div>
+  </>
+)}
         </div>
 
         <div className="shrink-0 flex flex-col justify-center gap-4 border-t border-gray-100 bg-white px-6 py-5 sm:flex-row">
