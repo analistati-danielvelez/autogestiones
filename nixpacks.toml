@@ -1,3 +1,2 @@
-[variables]
-NIXPACKS_NODE_VERSION = "22"
-NODE_ENV = "production"
+[phases.setup]
+aptPkgs = ["qpdf"]
