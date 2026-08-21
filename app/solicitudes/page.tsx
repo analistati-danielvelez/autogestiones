@@ -350,6 +350,7 @@ export default function SolicitudesPage() {
       { id: "detalle-pago", label: "Detalle de Pagos" },
       { id: "paz-salvo", label: "Paz y Salvo" },
       { id: "copia-contrato", label: "Copia de Contrato" },
+      { id: "declaracion-renta", label: "Declaración de renta" },
       { id: "retencion-fuente", label: "Certificado de Retención en la fuente" },
     ],
     retencion: [
@@ -808,6 +809,45 @@ export default function SolicitudesPage() {
     }
   };
 
+  const registrarSolicitudDeclaracionRenta = async () => {
+    setEnviandoDetallePago(true);
+  
+    try {
+      const respuesta = await fetch("/api/solicitudes/declaracion-renta", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          identificacion: identificacion.trim(),
+        }),
+      });
+  
+      const data = await respuesta.json();
+  
+      if (!respuesta.ok) {
+        alert(
+          data.message ||
+            "No fue posible registrar la solicitud de Declaración de renta."
+        );
+        return;
+      }
+  
+      alert(
+        data.message ||
+          "Solicitud enviada exitosamente.\n\nTu solicitud ha sido recibida y será validada por nuestro equipo. La respuesta será enviada al correo electrónico registrado dentro de los próximos tres (3) días hábiles."
+      );
+  
+      setMostrarModalPagosSolicitud(false);
+    } catch (error) {
+      alert(
+        "No fue posible registrar la solicitud de Declaración de renta en este momento."
+      );
+    } finally {
+      setEnviandoDetallePago(false);
+    }
+  };
+
   const registrarSolicitudCertificadoGastos = async () => {
     if (!cedulaFallecido.trim()) {
       alert("Por favor ingresa el número de identificación del fallecido.");
@@ -1097,6 +1137,7 @@ export default function SolicitudesPage() {
     return (
       certificadoSeleccionado === "detalle-pago" ||
       certificadoSeleccionado === "copia-contrato" ||
+      certificadoSeleccionado === "declaracion-renta" ||
       certificadoSeleccionado === "retencion-fuente"
     );
   };
@@ -1110,6 +1151,11 @@ export default function SolicitudesPage() {
   
     if (certificadoSeleccionado === "copia-contrato") {
       registrarSolicitudCopiaContrato();
+      return;
+    }
+
+    if (certificadoSeleccionado === "declaracion-renta") {
+      registrarSolicitudDeclaracionRenta();
       return;
     }
   
@@ -1933,6 +1979,17 @@ export default function SolicitudesPage() {
   </>
 )}
 
+{certificadoSeleccionado === "declaracion-renta" && (
+  <>
+    <div className="rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
+      <div className="flex items-start gap-3">
+        <Info className="mt-0.5 h-5 w-5 flex-none text-[#0090D1]" />
+        <p>{MENSAJE_INFORMATIVO_MODULO_DOS}</p>
+      </div>
+    </div>
+  </>
+)}
+
 {certificadoSeleccionado === "retencion-fuente" && (
   <>
     <div className="rounded-xl border border-[#0090D1]/20 bg-[#F5FAFD] px-5 py-4 text-left text-sm text-[#002869]">
@@ -1967,7 +2024,8 @@ export default function SolicitudesPage() {
             disabled={enviandoDetallePago}
           >
             {certificadoSeleccionado === "retencion-fuente" ||
-              certificadoSeleccionado === "copia-contrato"
+              certificadoSeleccionado === "copia-contrato" ||
+              certificadoSeleccionado === "declaracion-renta"
                 ? enviandoDetallePago
                   ? "Enviando..."
                   : "Solicitar certificado"
