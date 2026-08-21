@@ -501,6 +501,57 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
     );
   }
 
+  function obtenerTiempoFecha(valor: unknown) {
+    const fecha = obtenerFechaLocalSinDesfase(obtenerTexto(valor));
+  
+    if (!fecha || isNaN(fecha.getTime())) {
+      return 0;
+    }
+  
+    return fecha.getTime();
+  }
+  
+  function obtenerRegistroFallecidoPreferido(
+    coincidencias: unknown[],
+    identificacionTitularActual: string
+  ) {
+    const registros = coincidencias
+      .filter((registro) => {
+        return (
+          registro &&
+          typeof registro === "object" &&
+          !Array.isArray(registro)
+        );
+      })
+      .map((registro) => registro as Record<string, unknown>)
+      .sort((a, b) => {
+        const aEsTitular = personaEsTitularHistorico(
+          a,
+          identificacionTitularActual
+        )
+          ? 1
+          : 0;
+  
+        const bEsTitular = personaEsTitularHistorico(
+          b,
+          identificacionTitularActual
+        )
+          ? 1
+          : 0;
+  
+        if (bEsTitular !== aEsTitular) {
+          return bEsTitular - aEsTitular;
+        }
+  
+        return (
+          obtenerTiempoFecha(b.fecha_afiliacion) -
+          obtenerTiempoFecha(a.fecha_afiliacion)
+        );
+      });
+  
+    return registros[0] || null;
+  }
+
   function obtenerTitularHistoricoEnFecha(
     asegurados: unknown[],
     fechaFallecimiento: string,
@@ -817,10 +868,14 @@ function obtenerNombreProductoDesdeDetalle(detalleContrato: unknown) {
       return null;
     }
   
-    const registro = coincidencias[coincidencias.length - 1] as Record<
-      string,
-      unknown
-    >;
+    const registro = obtenerRegistroFallecidoPreferido(
+      coincidencias,
+      identificacionTitular
+    );
+    
+    if (!registro) {
+      return null;
+    }
   
     const nombreCompleto = obtenerNombreCompletoPersona(registro);
 const identificacion = obtenerTexto(registro.identificacion);
